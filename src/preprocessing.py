@@ -7,18 +7,17 @@ import spacy
 import re
 from tqdm import tqdm
 import numpy as np
-from typing import Any, Literal, List, Dict, Union, Tuple
+from typing import Any, Literal, List, Dict, Union, Tuple, Optional
+from unidecode import unidecode
 
 def load_nlps() -> Any:
 	"""
 	Load spacy models for Spanish and Catalan.
-	
 		Returns both models in a tuple.
 
 	Remember to download them first with:
-		$ python -m spacy download es_core_news_sm
-
-		$ python -m spacy download ca_core_news_sm
+	- $ python -m spacy download es_core_news_sm
+	- $ python -m spacy download ca_core_news_sm
 	"""
 	nlp_es = spacy.load("es_core_news_sm")
 	nlp_ca = spacy.load("ca_core_news_sm")
@@ -90,10 +89,24 @@ def tokenize_corpus(
 		corpus_sents: List[List[Dict[str, Any]]],
 		nlp_es: Any,
 		nlp_ca: Any,
+		remove_asterisk: bool = True,
+		remove_punctuation: bool = True,
+		remove_spaces: bool = True,
+		replace_numbers: Optional[str] = None,
 ) -> List[List[Dict[str, np.ndarray, str]]]:
 	"""
 	Tokenize a corpus into tokens.
-		Returns a list of lists of dictionaries with keys "tokens", "spans" and "lang".
+	Parameters:
+	- corpus_sents: list of lists of dictionaries with keys "text", "span" and "lang".
+	- nlp_es: spacy model for Spanish.
+	- nlp_ca: spacy model for Catalan.
+	- remove_asterisk: whether to remove asterisks or not.
+	- remove_punctuation: whether to remove punctuation or not.
+	- remove_spaces: whether to remove spaces or not.
+	- replace_numbers: string to replace numbers (integers, floats, dates...) with.
+		If None, numbers are kept.
+	
+	Returns a list of lists of dictionaries with keys "tokens", "spans" and "lang".
 	"""
 	tokens = []
 	for d in tqdm(corpus_sents):
@@ -108,9 +121,38 @@ def tokenize_corpus(
 				doc = nlp_ca.tokenizer(text)
 			_tokens = []
 			spans = []
+			asterisk_len = 0
+			asterisk_pos = 0
 			for token in doc:
-				if token.text != "*": _tokens.append(token.text)
-				spans.append([span[0] + token.idx, span[0] + token.idx + len(token.text)])
+				word = token.text
+				# handle asterisks
+				if word == "*":
+					if remove_asterisk: continue
+					else:
+						if asterisk_len == 0:
+							asterisk_pos = token.idx
+						asterisk_len += 1
+						continue
+				else:
+					if asterisk_len > 0:
+						_tokens.append("<HIDDEN>")
+						spans.append([span[0] + asterisk_pos, span[0] + asterisk_pos + asterisk_len])
+						asterisk_len = 0
+				# handle numbers
+				if re.fullmatch(r'(\d+[.,:/-]?)+', word) and replace_numbers:
+					word = replace_numbers
+				# remove punctuation
+				elif remove_punctuation:
+					word = re.sub(r'[^\w\s]|[ºª]', '', word)
+				# remove spaces
+				if remove_spaces:
+					word = word.strip()
+				# unidecode in case of weird characters
+				word = unidecode(word)
+				# append token
+				if word:
+					_tokens.append(word)
+					spans.append([span[0] + token.idx, span[0] + token.idx + len(token.text)])
 			sent_tokens = {"tokens": np.array(_tokens), "spans": np.array(spans), "lang": lang}
 			d_tokens.append(sent_tokens)
 		tokens.append(d_tokens)
