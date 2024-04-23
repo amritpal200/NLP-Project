@@ -4,11 +4,13 @@ import pprint
 from langdetect import detect, DetectorFactory
 import nltk
 import spacy
+from spacy.tokenizer import Tokenizer
 import re
 from tqdm import tqdm
 import numpy as np
 from typing import Any, Literal, List, Dict, Union, Tuple, Optional
 from unidecode import unidecode
+from copy import deepcopy
 
 def load_nlps() -> Any:
 	"""
@@ -157,3 +159,40 @@ def tokenize_corpus(
 			d_tokens.append(sent_tokens)
 		tokens.append(d_tokens)
 	return tokens
+
+def lemmatize_corpus(
+		tokens: List[List[Dict[str, np.ndarray, str]]],
+		nlp_es: Any,
+		nlp_ca: Any,
+) -> List[List[Dict[str, np.ndarray, str]]]:
+	"""
+	Lemmatize a corpus.
+		Returns a list of lists of dictionaries with keys "lemmas", "spans" and "lang".
+	"""
+	def custom_tokenizer(nlp):
+		return Tokenizer(nlp.vocab, token_match=re.compile(r'\S+').match)
+
+	# print("Preparing tokenizers...")
+	nlp_es_custom = deepcopy(nlp_es)
+	nlp_es_custom.tokenizer = custom_tokenizer(nlp_es_custom)
+	nlp_ca_custom = deepcopy(nlp_ca)
+	nlp_ca_custom.tokenizer = custom_tokenizer(nlp_ca_custom)
+
+	# print("Lemmatizing...")
+	tokens_lemmatized = []
+	for d in tqdm(tokens):
+		d_tokens = []
+		for sent in d:
+			lang = sent["lang"]
+			# lemmatization works better with the whole sentence
+			if lang == "es":
+				doc = nlp_es_custom(" ".join(sent["tokens"]))
+			else:
+				doc = nlp_ca_custom(" ".join(sent["tokens"]))
+			lemmas = [token.lemma_ for token in doc]
+			assert len(lemmas) == len(sent["tokens"]), f"\n{lemmas}\n{sent['tokens']}"
+			sent_tokens = {"tokens": np.array(lemmas), "spans": sent["spans"], "lang": lang}
+			d_tokens.append(sent_tokens)
+		tokens_lemmatized.append(d_tokens)
+	
+	return tokens_lemmatized
