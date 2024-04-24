@@ -196,3 +196,39 @@ def lemmatize_corpus(
 		tokens_lemmatized.append(d_tokens)
 	
 	return tokens_lemmatized
+
+def save_tokens(
+		tokens: List[List[Dict[str, np.ndarray, str]]],
+		path: str,
+) -> None:
+	"""
+	Save tokens to a JSON file.
+	"""
+	tokens = [
+		{
+			"tokens": sent["tokens"].tolist(),
+			"spans": sent["spans"].tolist(),
+			"lang": sent["lang"]
+		}
+		for d in tokens for sent in d
+	]
+	with open(path, 'w') as f:
+		json.dump(tokens, f)
+
+def load_tokens(
+		path
+) -> List[Dict[str, Union[np.ndarray, str]]]:
+	"""
+	Load tokens from a JSON file.
+	"""
+	with open(path, 'r') as f:
+		tokens = json.load(f)
+	tokens = [
+		{
+			"tokens": np.array(sent["tokens"]),
+			"spans": np.array(sent["spans"]),
+			"lang": sent["lang"]
+		}
+		for sent in tokens
+	]
+	return tokens
