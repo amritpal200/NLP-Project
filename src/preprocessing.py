@@ -238,3 +238,42 @@ def load_tokens(
 		for doc in tokens
 	]
 	return tokens
+
+def get_tokens(
+		doc_tokens: List[Dict[str, np.ndarray, str]],
+		start: int,
+		end: int,
+		truncate: bool=False,
+		return_indices: bool=False
+) -> Tuple[Union[np.ndarray, List[np.ndarray]], np.ndarray]:
+	"""
+	Get tokens from a document that intersect with a span.
+	
+	Parameters:
+	- doc_tokens: the tokens of the document stored as dictionaries.
+	- start: start of the span.
+	- end: end of the span.
+	- truncate: if True, will only return tokens that are completely inside the span.
+	- return_indices: if True, will return the indices of the tokens by sentence instead
+		of the tokens themselves.
+
+	Returns a tuple with the tokens (or their indices) and the indices of the sentences 
+		where they are present.
+	"""
+	indices = []
+	present_sents = []
+	for s, sent in enumerate(doc_tokens):
+		spans = sent["spans"]
+		start2 = spans[:, 0]
+		end2 = spans[:, 1]
+		if truncate:
+			intersects = (start2 >= start) & (end2 <= end)
+		else:
+			intersects = (start2 <= end) & (end2 >= start)
+		if intersects.any():
+			indices.append(np.array(intersects.nonzero()[0]))
+			present_sents.append(s)
+	present_sents = np.array(present_sents)
+	if return_indices:
+		return indices, present_sents
+	return np.concatenate([sent["tokens"][i] for i, sent in zip(indices, np.array(doc_tokens)[present_sents])]), present_sents
