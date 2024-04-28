@@ -95,7 +95,7 @@ def tokenize_corpus(
 		remove_punctuation: bool = True,
 		remove_spaces: bool = True,
 		replace_numbers: Optional[str] = None,
-) -> List[List[Dict[str, np.ndarray, str]]]:
+) -> List[List[Dict[str, Union[np.ndarray, str]]]]:
 	"""
 	Tokenize a corpus into tokens.
 	Parameters:
@@ -161,10 +161,10 @@ def tokenize_corpus(
 	return tokens
 
 def lemmatize_corpus(
-		tokens: List[List[Dict[str, np.ndarray, str]]],
+		tokens: List[List[Dict[str, Union[np.ndarray, str]]]],
 		nlp_es: Any,
 		nlp_ca: Any,
-) -> List[List[Dict[str, np.ndarray, str]]]:
+) -> List[List[Dict[str, Union[np.ndarray, str]]]]:
 	"""
 	Lemmatize a corpus.
 		Returns a list of lists of dictionaries with keys "lemmas", "spans" and "lang".
@@ -198,7 +198,7 @@ def lemmatize_corpus(
 	return tokens_lemmatized
 
 def save_tokens(
-		tokens: List[List[Dict[str, np.ndarray, str]]],
+		tokens: List[List[Dict[str, Union[np.ndarray, str]]]],
 		path: str,
 ) -> None:
 	"""
@@ -220,7 +220,7 @@ def save_tokens(
 
 def load_tokens(
 		path
-) -> List[List[Dict[str, np.ndarray, str]]]:
+) -> List[List[Dict[str, Union[np.ndarray, str]]]]:
 	"""
 	Load tokens from a JSON file.
 	"""
@@ -240,7 +240,7 @@ def load_tokens(
 	return tokens
 
 def get_tokens(
-		doc_tokens: List[Dict[str, np.ndarray, str]],
+		doc_tokens: List[Dict[str, Union[np.ndarray, str]]],
 		start: int,
 		end: int,
 		truncate: bool=False,
