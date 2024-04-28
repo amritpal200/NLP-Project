@@ -104,7 +104,10 @@ def get_contexts_bin(
 	near_bin = np.abs(context_dis) <= 5
 	context_near_bin = context_bin & near_bin
 	context_near = [terms_idx[i][context_near_bin[i]] for i in range(len(neg_idx))]
-	context_end = np.array([context_near[i].max() if neg_dir[i] else context_near[i].min() for i in range(len(neg_idx))])
+	context_end = np.array([context_near[i].max(initial=-1) if neg_dir[i] \
+						else context_near[i].min(initial=-1) for i in range(len(neg_idx))])
+	if np.any(context_end == -1):
+		return [np.zeros_like(terms_bin) for _ in neg_idx]
 	context_idx = [np.arange(neg_idx[i]+neg_dir[i], context_end[i]+neg_dir[i], neg_dir[i]) for i in range(len(neg_idx))]
 	context_bin = [np.zeros_like(terms_bin) for _ in context_idx]
 	[np.put(ar, indices, 1) for ar, indices in zip(context_bin, context_idx)]
@@ -118,3 +121,79 @@ def get_contexts_span(
 	tokens_span = [spans[np.where(indices)[0]] for indices in contexts_bin]
 	contexts_span = [[span[0][0], span[-1][1]] for span in tokens_span]
 	return contexts_span
+
+def save_spans(
+		spans: Tuple[np.ndarray, np.ndarray]
+) -> List[Dict]:
+	current_spans = []
+	neg_spans, spec_spans = spans
+	for span in neg_spans:
+		current_spans.append({"value": {"start": span[0], "end": span[1], "labels": ["NEG"]}})
+	for span in spec_spans:
+		current_spans.append({"value": {"start": span[0], "end": span[1], "labels": ["SPEC"]}})
+	return current_spans
+
+def process_sent(
+		sent: Dict,
+		cutext_path: Optional[str] = None,
+		negation_speculation_path: Optional[str] = None
+) -> List[Dict]:
+	if not negation_speculation_path:
+		negation_speculation_path = os.path.join(ROOT_DIR, "data", "negation_speculation_word.txt")
+	try:
+		terms = get_medical_terms(sent["tokens"], cutext_path)
+		negation_words, negation_dirs, speculation_words, speculation_dirs = \
+			prepare_negation_speculation(negation_speculation_path)
+		neg_idx, neg_dir, unc_idx, unc_dir, terms_idx, terms_bin = \
+			get_indices(sent["tokens"], terms, negation_words, negation_dirs, speculation_words, speculation_dirs)
+		neg_contexts_bin = get_contexts_bin(terms_bin, terms_idx, neg_idx, neg_dir)
+		spec_contexts_bin = get_contexts_bin(terms_bin, terms_idx, unc_idx, unc_dir)
+		neg_contexts_span = get_contexts_span(sent["spans"], neg_contexts_bin)
+		spec_contexts_span = get_contexts_span(sent["spans"], spec_contexts_bin)
+		return save_spans((neg_contexts_span, spec_contexts_span))
+	except:
+		return []
+	
+def process_doc(
+		doc: List[Dict],
+		cutext_path: Optional[str] = None,
+		negation_speculation_path: Optional[str] = None
+) -> List[Dict]:
+	all_spans = []
+	for sent in doc:
+		spans = process_sent(
+			sent,
+			cutext_path=cutext_path,
+			negation_speculation_path=negation_speculation_path)
+		all_spans.extend(spans)
+	return {"result": all_spans}
+
+def process_data(
+		data: List[List[Dict]],
+		cutext_path: Optional[str] = None,
+		negation_speculation_path: Optional[str] = None
+) -> List[Dict]:
+	predictions = []
+	for doc in tqdm(data):
+		spans = process_doc(
+			doc,
+			cutext_path=cutext_path,
+			negation_speculation_path=negation_speculation_path)
+		predictions.append(spans)
+	return predictions
+
+def _convert_int64_to_int(obj):
+	if isinstance(obj, np.int64):
+		return int(obj)
+	return obj
+
+def write_predictions(
+		data: List[Dict],
+		predictions: List[Dict],
+		name: str
+):
+	data_copy = data.copy()
+	for i in range(len(data_copy)):
+		data_copy[i]["predictions"] = predictions[i]
+	with open(os.path.join(ROOT_DIR, "data", name), "w") as f:
+		json.dump(data_copy, f, default=_convert_int64_to_int)
