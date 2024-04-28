@@ -2,8 +2,10 @@ import json
 import random
 import numpy as np
 import nltk
+import os
 from sklearn.metrics import precision_score, recall_score, f1_score
 
+ROOT_DIR = os.path.dirname(os.path.abspath(""))
 
 class EvalOfficial:
     def __init__(self):
@@ -30,9 +32,10 @@ class EvalOfficial:
         f1 = f1_score(gt, pred, average='micro')
         return precision, recall, f1
 
-        
-with open('negacio_test_v2024.json', 'r', encoding='utf8') as _f:
-    test_data = json.load(_f)
-metric = EvalOfficial()
-p, r, f1 = metric.calc(test_data, test_data)
-print(f'Precision: {p}, Recall:{r}, F1:{f1}')
+
+if __name__ == "__main__":
+	with open(os.path.join(ROOT_DIR, "data", 'test_data.json'), 'r', encoding='utf8') as _f:
+		test_data = json.load(_f)
+	metric = EvalOfficial()
+	p, r, f1 = metric.calc(test_data, test_data)
+	print(f'Precision: {p}, Recall:{r}, F1:{f1}')
