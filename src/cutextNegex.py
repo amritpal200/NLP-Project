@@ -3,6 +3,8 @@ import blindNegex
 import os
 import cutext
 
+ROOT_DIR = os.path.dirname(os.path.abspath(""))
+
 def write_tokens_txt(
 		tokens: np.ndarray,
 		path: str
