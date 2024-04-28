@@ -87,7 +87,7 @@ class negTagger(object):
                 prenFlag = 1
                 overlapFlag = 0
 
-            if sentenceTokens[i][:6] in ['[CONJ]', '[PSEU]', '[POST]', '[PREP]', '[POSP]']:
+            if sentenceTokens[i][:6] in ['[POST]', '[PREP]', '[POSP]']:
                 overlapFlag = 1
             
             if i+1 < len(sentenceTokens):
@@ -118,7 +118,7 @@ class negTagger(object):
                 postFlag = 1
                 overlapFlag = 0
 
-            if sentenceTokens[i][:6] in ['[CONJ]', '[PSEU]', '[PREN]', '[PREP]', '[POSP]']:
+            if sentenceTokens[i][:6] in ['[PREN]', '[PREP]', '[POSP]']:
                 overlapFlag = 1
             
             if i+1 < len(sentenceTokens):
@@ -174,7 +174,9 @@ class negTagger(object):
             sentencePortion = ''
             sb3.reverse()
             sentenceTokens = sb3 
-            sb4 = []
+
+            sb4 = [] # List to build sentence for possible post-negation
+
             # Check for [POSP]
             for i in range(len(sentenceTokens)):
                 if sentenceTokens[i][:6] == '[POSP]':
@@ -211,12 +213,16 @@ class negTagger(object):
         
         self.__negTaggedSentence = self.__negTaggedSentence.replace(filler, ' ')
         
+        # Iterate over each line in the list of negation scopes
         for line in aScopes:
-            tokensToReturn = []
-            thisLineTokens = line.split()
+            tokensToReturn = []  # List to store tokens in the current line excluding negation markers
+            thisLineTokens = line.split()  # Split the line into individual tokens
+            # Iterate over each token in the line
             for token in thisLineTokens:
+                # Check if the token is not a negation marker
                 if token[:6] not in ['[PREN]', '[PREP]', '[POST]', '[POSP]']:
-                    tokensToReturn.append(token)
+                    tokensToReturn.append(token)  # Add the token to the list of tokens to return
+            # Join the tokens into a string and append it to the list of negation scopes to return
             self.__scopesToReturn.append(' '.join(tokensToReturn))
 
     def getNegTaggedSentence(self):
