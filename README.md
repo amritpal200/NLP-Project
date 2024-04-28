@@ -1,8 +1,6 @@
 # Natural Language Processing Project
 Group project for the NLP subject in our AI degree.
 
->*This branch is outdated, please go to the [main](https://github.com/amritpal200/NLP-Project) branch.*
-
 ## Files in this repository
 - `config`: contains global files required by programs, such as config.json with global variables.
 - `data`: contains the training and test data, as well as preprocessed data useful for our models.
