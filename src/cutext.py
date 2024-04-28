@@ -56,3 +56,12 @@ def process_input(
 	input_path = os.path.join(ROOT_DIR, "temp", "cutext_in.txt")
 	output_dir = os.path.join(ROOT_DIR, "temp")
 	run_cutext(input_path, output_dir, cutext_path=cutext_path)
+
+def clean_temp(
+		all: bool=False
+) -> None:
+	temp_dir = os.path.join(ROOT_DIR, "temp")
+	if not os.path.exists(temp_dir): return
+	for file in os.listdir(temp_dir):
+		if file.startswith(".fuse_hidden") or all:
+			os.remove(os.path.join(temp_dir, file))
