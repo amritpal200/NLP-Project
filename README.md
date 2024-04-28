@@ -19,7 +19,7 @@ Group project for the NLP subject in our AI degree.
 - Common NLP libraries: `nltk`, `spacy`, `langdetect`
 
 ## Contributors
-- Amritpal
+- Amritpal Singh
 - Oscar Arrocha
 - Mustapha El Aichouni
 - Eric López
