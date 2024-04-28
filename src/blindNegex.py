@@ -1,4 +1,5 @@
 import re
+import json
 
 def read_negations(file_path):
 	negations = {}
@@ -104,9 +105,19 @@ def tag_negations(sentence, negations):
 			i+=1
 	return tagged_sentence
 
-def process_text(input_file, output_file, negations):
-	with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
-		for line in infile:
-			sentence = line.strip()
-			tagged_sentence = tag_negations(sentence, negations)
-			outfile.write(tagged_sentence + '\n')
+def process_text(data, negations, output_file):
+    copy_json_object = data
+    
+    # Reset predictions result list for each data item
+    for i in range(len(copy_json_object)):
+        copy_json_object[i]["predictions"][0]["result"] = []
+    
+    # Iterate over each data item
+    for i in range(len(data)):
+        text = data[i]["data"]["text"]
+        result = tag_negations(text, negations)
+        copy_json_object[i]["predictions"][0]["result"].extend(result)
+    
+    # Write updated data to output file
+    with open(output_file, "w") as json_file:
+        json.dump(copy_json_object, json_file)
