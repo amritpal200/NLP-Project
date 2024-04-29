@@ -16,6 +16,7 @@ Group project for the NLP subject in our AI degree.
 - CUTEXT:
 	- installation instructions [here](https://github.com/PlanTL-GOB-ES/CUTEXT)
 	- also requires [TreeTagger](https://www.cis.lmu.de/~schmid/tools/TreeTagger/)
+	- once installed, write the path to your CUTEXT repository in `config.json`
 - Common NLP libraries: `nltk`, `spacy`, `langdetect`
 
 ## Contributors
