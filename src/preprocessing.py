@@ -264,6 +264,7 @@ def get_tokens(
 	present_sents = []
 	for s, sent in enumerate(doc_tokens):
 		spans = sent["spans"]
+		if not spans.size: continue
 		start2 = spans[:, 0]
 		end2 = spans[:, 1]
 		if truncate:
