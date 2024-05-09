@@ -1,7 +1,7 @@
 from preprocessing import *
 import blindNegex
 import os
-import cutext
+import deprecated.cutext as cutext
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
 
