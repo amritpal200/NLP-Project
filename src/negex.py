@@ -98,12 +98,13 @@ def get_contexts_bin(
 		terms_bin: np.ndarray,
 		terms_idx: np.ndarray,
 		neg_idx: np.ndarray,
-		neg_dir: np.ndarray
+		neg_dir: np.ndarray,
+		max_context_size: int
 ) -> List[np.ndarray]:
 	terms_idx = np.repeat(terms_idx[None, :], len(neg_idx), axis=0)
 	context_dis = terms_idx - neg_idx[:, None]
 	context_bin = np.sign(context_dis) == neg_dir[:, None]
-	near_bin = np.abs(context_dis) <= 5
+	near_bin = np.abs(context_dis) <= max_context_size
 	context_near_bin = context_bin & near_bin
 	context_near = [terms_idx[i][context_near_bin[i]] for i in range(len(neg_idx))]
 	context_end = np.array([context_near[i].max(initial=-1) if neg_dir[i] \
@@ -142,13 +143,14 @@ def process_sent(
 		negation_dirs: np.ndarray,
 		speculation_words: np.ndarray,
 		speculation_dirs: np.ndarray,
+		max_context_size: int
 ) -> List[Dict]:
 	try:
 		terms = get_medical_terms(sent["tokens"], all_medical_terms)
 		neg_idx, neg_dir, unc_idx, unc_dir, terms_idx, terms_bin = \
 			get_indices(sent["tokens"], terms, negation_words, negation_dirs, speculation_words, speculation_dirs)
-		neg_contexts_bin = get_contexts_bin(terms_bin, terms_idx, neg_idx, neg_dir)
-		spec_contexts_bin = get_contexts_bin(terms_bin, terms_idx, unc_idx, unc_dir)
+		neg_contexts_bin = get_contexts_bin(terms_bin, terms_idx, neg_idx, neg_dir, max_context_size)
+		spec_contexts_bin = get_contexts_bin(terms_bin, terms_idx, unc_idx, unc_dir, max_context_size)
 		neg_contexts_span = get_contexts_span(sent["spans"], neg_contexts_bin)
 		spec_contexts_span = get_contexts_span(sent["spans"], spec_contexts_bin)
 		return save_spans((neg_contexts_span, spec_contexts_span))
@@ -162,6 +164,7 @@ def process_doc(
 		negation_dirs: np.ndarray,
 		speculation_words: np.ndarray,
 		speculation_dirs: np.ndarray,
+		max_context_size: int
 ) -> List[Dict]:
 	all_spans = []
 	for sent in doc:
@@ -171,13 +174,15 @@ def process_doc(
 			negation_words,
 			negation_dirs,
 			speculation_words,
-			speculation_dirs
+			speculation_dirs,
+			max_context_size
 		)
 		all_spans.extend(spans)
 	return {"result": all_spans}
 
 def process_data(
 		data: List[List[Dict]],
+		max_context_size: int = 5
 ) -> List[Dict]:
 	predictions = []
 	all_medical_terms = np.array(read_terms(os.path.join(ROOT_DIR, "data", "medical_terms.txt")))
@@ -191,7 +196,8 @@ def process_data(
 			negation_words,
 			negation_dirs,
 			speculation_words,
-			speculation_dirs
+			speculation_dirs,
+			max_context_size
 		)
 		predictions.append(spans)
 	return predictions
@@ -204,11 +210,16 @@ def _convert_int64_to_int(obj):
 def write_predictions(
 		data: List[Dict],
 		predictions: List[Dict],
-		name: str
+		name: str,
+		dir: Optional[str] = None
 ):
 	data_copy = data.copy()
 	for i in range(len(data_copy)):
 		data_copy[i]["predictions"] = []
 		data_copy[i]["predictions"].append(predictions[i])
-	with open(os.path.join(ROOT_DIR, "data", name), "w") as f:
+	if dir is None:
+		path = os.path.join(ROOT_DIR, "data", name)
+	else:
+		path = os.path.join(ROOT_DIR, dir, name)
+	with open(path, "w") as f:
 		json.dump(data_copy, f, default=_convert_int64_to_int)
