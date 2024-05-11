@@ -4,3 +4,4 @@
 *.pyc
 temp
 latex/
+models/*0_*
