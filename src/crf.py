@@ -275,4 +275,86 @@ class CRF:
 
 		return y
 
-	# def process
+	def process(
+			self,
+			data_path: str,
+			tokens_path: str,
+			save_path: str,
+			pos_path: Optional[str] = None
+	):
+		"""
+		Processes the given data and saves the results to a file.
+		"""
+		with open(data_path, "r") as f:
+			data = json.load(f)
+		data_tokens = load_tokens(tokens_path)
+		if pos_path is not None:
+			with open(pos_path, "r") as f:
+				pos = json.load(f)
+		else:
+			pos = None
+		save_dir = os.path.dirname(save_path)
+		if not os.path.exists(save_dir):
+			os.makedirs(save_dir)
+
+		# Predict labels
+		preds = []
+		for d, doc_tokens in tqdm(enumerate(data_tokens), total=len(data_tokens)):
+			doc_results = []
+			for i, sentence in enumerate(doc_tokens):
+				tokens = sentence["tokens"]
+				if pos is not None:
+					sent_pos = pos[d][i]
+				else:
+					sent_pos = None
+				lang = sentence["lang"]
+				labels = self.predict(tokens, sent_pos, lang)
+				doc_results.append(labels)
+			preds.append(doc_results)
+
+		# Save preds to formated predictions
+		tags = {"B-NEG": "NEG", "I-NEG": "NSCO", "B-UNC": "UNC", "I-UNC": "USCO"}
+		predictions = []
+		for d, doc_preds in enumerate(preds):
+			doc_results = []
+			for s, sent_preds in enumerate(doc_preds):
+				tag = None
+				for i, label in enumerate(sent_preds):
+					if tags.get(label, ".") != tag:
+						if tag is not None:
+							doc_results.append({
+								"value": {
+									"start": int(start),
+									"end": int(end),
+									"labels": [tag]
+								}
+							})
+						start = None
+						end = None
+						tag = None
+					if label == "O":
+						continue
+					if start is None:
+						start, end = data_tokens[d][s]["spans"][i]
+						tag = tags[label]
+					else:
+						end = data_tokens[d][s]["spans"][i][1]
+				if tag is not None:
+					doc_results.append({
+						"value": {
+							"start": int(start),
+							"end": int(end),
+							"labels": [tag]
+						}
+					})
+			predictions.append([
+				{
+					"result": doc_results
+				}
+			])
+		
+		for d in range(len(data)):
+			data[d]["predictions"] = predictions[d]
+
+		with open(save_path, "w") as f:
+			json.dump(data, f, indent=4)
