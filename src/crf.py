@@ -3,13 +3,39 @@ from preprocessing import *
 import os
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
+def put_bio(data, data_tokens, train_data_bio):
+	tags = {"NEG": "B-NEG", "NSCO": "I-NEG", "UNC": "B-UNC", "USCO": "I-UNC"}
+
+	for i, tokens_group in enumerate(data_tokens): 
+		spans = data[i]["predictions"][0]["result"]
+		for span in spans:
+			span_tag = span["value"]["labels"][0]
+			if span_tag in tags:
+				start = span["value"]["start"]
+				for j, token_info in enumerate(tokens_group):
+					# Check if the last span end is before the current span start
+					if not token_info["spans"].any(axis=None) or token_info["spans"][-1][-1] < start:
+						continue
+					# Process spans within the current token_info
+					for index, k in enumerate(token_info["spans"]):
+						# This condition assumes perfect alignment
+						if k[0] <= start <= k[1]:
+							train_data_bio[i][j][index] = tags[span_tag]
+							break
+					break  # Breaking only if we made a change
+
+def create_bio_tags(data, data_tokens):
+	data_bio = [[["O"]*len(sent["tokens"]) for sent in doc] for doc in data_tokens]
+	put_bio(data, data_tokens, data_bio)
+	return data_bio
 
 class CRF:
 
 	def __init__(
 			self,
 			model_path: str,
-			trainer_params: Optional[Dict[str, Any]] = None
+			trainer_params: Optional[Dict[str, Any]] = None,
+			verbose: bool = False
 	):
 		self.model_path = model_path
 
@@ -18,8 +44,12 @@ class CRF:
 			self.tagger.open(model_path)
 			self.trainer = None
 		else:
+			model_dir = os.path.dirname(model_path)
+			if not os.path.exists(model_dir):
+				os.makedirs(model_dir)
+
 			self.tagger = None
-			self.trainer = crfs.Trainer()
+			self.trainer = crfs.Trainer(verbose=verbose)
 
 			if trainer_params is not None:
 				self.trainer.set_params(trainer_params)
@@ -35,7 +65,8 @@ class CRF:
 		word, _ = sent[i]
 		features = [
 			"bias",
-			"word.lower=" + word.lower(),
+			"word=" + word,
+			
 		]
 
 		# add more features
@@ -80,10 +111,16 @@ class CRF:
 		if self.trainer is None:
 			raise ValueError("Model already trained")
 		
-		train_data = load_tokens(os.path.join(ROOT_DIR, "data", "training_data_tokens.json"))
-		# train_labels = # here load labels (BIO tagging) of same shape as train_data
+		train_data = load_tokens(train_tokens_path)
+		with open(train_labels_path, "r") as f:
+			train_labels = json.load(f)
 
-		# sents = # here merge train_data and train_labels so format is List[List[Tuple[str, str]]]
+		sents = []
+		for doc_tokens, doc_labels in zip(train_data, train_labels):
+			sent = []
+			for tokens, labels in zip(doc_tokens, doc_labels):
+				sent.extend(list(zip(tokens["tokens"], labels)))
+			sents.append(sent)
 
 		X_train = [self.sent2features(sent) for sent in sents]
 		y_train = [self.sent2labels(sent) for sent in sents]
@@ -113,4 +150,6 @@ class CRF:
 		x = self.sent2features(sent)
 		y = self.tagger.tag(x)
 
-		return list(zip(tokens, y))
+		return y
+
+	# def process
