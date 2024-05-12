@@ -37,7 +37,8 @@ def create_bio_tags(data, data_tokens):
 
 def precompute_pos(
 		tokens_path: str,
-		pos_path: str
+		pos_path: str,
+		verbose: bool = False
 ):
 	"""
 	Precomputes POS tags for the given tokens and saves them to a file.
@@ -48,7 +49,7 @@ def precompute_pos(
 		os.makedirs(pos_dir)
 	tokens = load_tokens(tokens_path)
 	pos = []
-	for doc in tqdm(tokens):
+	for doc in tqdm(tokens, total=len(tokens), disable=not verbose):
 		doc_pos = []
 		for sentence in doc:
 			lang = sentence["lang"]
@@ -67,10 +68,13 @@ class CRF:
 			self,
 			model_path: str,
 			trainer_params: Optional[Dict[str, Any]] = None,
+			nlps: Optional[Tuple[Any, Any]] = None,
 			verbose: bool = False
 	):
 		self.model_path = model_path
-		self.nlp_es, self.nlp_ca = load_nlps()
+		if nlps is None:
+			nlps = load_nlps()
+		self.nlp_es, self.nlp_ca = nlps
 		self.nlp_es.disable_pipes('ner', 'parser')
 		self.nlp_ca.disable_pipes('ner', 'parser')
 
@@ -81,6 +85,7 @@ class CRF:
 		self.special_words = trainer_params.get("special_words",\
 			["nada", "ni", "nunca", "ningun", "ninguno", "ninguna", "alguna", "apenas", "para_nada", "ni_siquiera"])
 		trainer_params = {k:v for k,v in trainer_params.items() if k not in other_params}
+		self.verbose = verbose
 
 		if os.path.exists(model_path):
 			self.tagger = crfs.Tagger()
@@ -92,7 +97,7 @@ class CRF:
 				os.makedirs(model_dir)
 
 			self.tagger = None
-			self.trainer = crfs.Trainer(verbose=verbose)
+			self.trainer = crfs.Trainer(verbose=False)
 
 			if trainer_params is not None:
 				self.trainer.set_params(trainer_params)
@@ -101,7 +106,7 @@ class CRF:
 			self,
 			sent: List[Tuple[str, str, str]],
 			idx: int
-	):
+	) -> List[str]:
 		"""
 		Returns a list of features for a given word in a sentence.
 		"""
@@ -180,7 +185,7 @@ class CRF:
 	def sent2features(
 			self,
 			sent: List[Tuple[str, str]]
-	):
+	) -> List[List[str]]:
 		"""
 		Returns a list of features for each word in a sentence.
 		"""
@@ -189,7 +194,7 @@ class CRF:
 	def sent2labels(
 			self,
 			sent: List[Tuple[str, str]]
-	):
+	) -> List[str]:
 		"""
 		Returns a list of labels for each word in a sentence.
 		"""
@@ -198,7 +203,7 @@ class CRF:
 	def sent2tokens(
 			self,
 			sent: List[Tuple[str, str]]
-	):
+	) -> List[str]:
 		"""
 		Returns a list of tokens in a sentence.
 		"""
@@ -209,7 +214,7 @@ class CRF:
 			train_tokens_path: str,
 			train_labels_path: str,
 			train_pos_path: Optional[str] = None
-	):
+	) -> None:
 		"""
 		Trains the CRF model on the given training data.
 		"""
@@ -224,7 +229,8 @@ class CRF:
 				train_pos = json.load(f)
 
 		sents = []
-		for d, (doc_tokens, doc_labels) in tqdm(enumerate(zip(train_data, train_labels)), total=len(train_data)):
+		for d, (doc_tokens, doc_labels) in tqdm(enumerate(zip(train_data, train_labels)),\
+										  total=len(train_data), disable=not self.verbose):
 			sent = []
 			for s, (sentence, labels) in enumerate(zip(doc_tokens, doc_labels)):
 				if train_pos_path is not None:
@@ -246,9 +252,9 @@ class CRF:
 			self.trainer.append(xseq, yseq)
 
 		# train and save model
-		print("Training model...")
+		if self.verbose: print("Training model...")
 		self.trainer.train(self.model_path)
-		print("Model trained")
+		if self.verbose: print("Model trained")
 
 		self.tagger = crfs.Tagger()
 		self.tagger.open(self.model_path)
@@ -285,7 +291,7 @@ class CRF:
 			tokens_path: str,
 			save_path: str,
 			pos_path: Optional[str] = None
-	):
+	) -> None:
 		"""
 		Processes the given data and saves the results to a file.
 		"""
@@ -303,7 +309,7 @@ class CRF:
 
 		# Predict labels
 		preds = []
-		for d, doc_tokens in tqdm(enumerate(data_tokens), total=len(data_tokens)):
+		for d, doc_tokens in tqdm(enumerate(data_tokens), total=len(data_tokens), disable=not self.verbose):
 			doc_results = []
 			for i, sentence in enumerate(doc_tokens):
 				tokens = sentence["tokens"]
