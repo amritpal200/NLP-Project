@@ -6,25 +6,29 @@ import string
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
 def put_bio(data, data_tokens, train_data_bio):
-	tags = {"NEG": "B-NEG", "NSCO": "I-NEG", "UNC": "B-UNC", "USCO": "I-UNC"}
+	tags = {"NEG": ["B-NEG", "I-NEG"], "NSCO": ["B-NSCO", "I-NSCO"],\
+		 	"UNC": ["B-UNC", "I-UNC"], "USCO": ["B-USCO", "I-USCO"]}
 
-	for i, tokens_group in enumerate(data_tokens): 
-		spans = data[i]["predictions"][0]["result"]
-		for span in spans:
-			span_tag = span["value"]["labels"][0]
+	for d, doc in enumerate(data_tokens): 
+		res_spans = data[d]["predictions"][0]["result"]
+		for res_span in res_spans:
+			span_tag = res_span["value"]["labels"][0]
 			if span_tag in tags:
-				start = span["value"]["start"]
-				for j, token_info in enumerate(tokens_group):
-					# Check if the last span end is before the current span start
-					if not token_info["spans"].any(axis=None) or token_info["spans"][-1][-1] < start:
+				start = res_span["value"]["start"]
+				end = res_span["value"]["end"]
+				for s, sent in enumerate(doc):
+					# Check if res_span is in this sentence
+					if not sent["spans"].any(axis=None) or sent["spans"][0][0] > end or sent["spans"][-1][-1] < start:
 						continue
-					# Process spans within the current token_info
-					for index, k in enumerate(token_info["spans"]):
-						# This condition assumes perfect alignment
-						if k[0] <= start <= k[1]:
-							train_data_bio[i][j][index] = tags[span_tag]
+					# Find the span in the sentence
+					found = False
+					for i, span in enumerate(sent["spans"]):
+						if span[0] >= start and span[1] <= end:
+							train_data_bio[d][s][i] = tags[span_tag][found]
+							found = True
+						elif found: # found and we are out of the span
 							break
-					break  # Breaking only if we made a change
+					break # we found the sentence
 
 def create_bio_tags(data, data_tokens):
 	data_bio = [[["O"]*len(sent["tokens"]) for sent in doc] for doc in data_tokens]
@@ -313,7 +317,8 @@ class CRF:
 			preds.append(doc_results)
 
 		# Save preds to formated predictions
-		tags = {"B-NEG": "NEG", "I-NEG": "NSCO", "B-UNC": "UNC", "I-UNC": "USCO"}
+		tags = {"B-NEG": "NEG", "I-NEG": "NEG", "B-NSCO": "NSCO", "I-NSCO": "NSCO",\
+		  		"B-UNC": "UNC", "I-UNC": "UNC", "B-USCO": "USCO", "I-USCO": "USCO"}
 		predictions = []
 		for d, doc_preds in enumerate(preds):
 			doc_results = []
