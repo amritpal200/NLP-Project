@@ -70,13 +70,14 @@ def sent_tokenize(
 
 def sent_tokenize_corpus(
 		corpus: List[Dict[str, Any]],
+		verbose: bool = False
 ) -> List[List[Dict[str, Any]]]:
 	"""
 	Tokenize a corpus into sentences.
 		Returns a list of lists of dictionaries with keys "text", "span" and "lang".
 	"""
 	corpus_sents = []
-	for d in tqdm(corpus):
+	for d in tqdm(corpus, disable=not verbose):
 		text = d["data"]["text"]
 		spans = sent_tokenize(text)
 		for i, s in enumerate(spans):
@@ -95,6 +96,7 @@ def tokenize_corpus(
 		remove_punctuation: bool = True,
 		remove_spaces: bool = True,
 		replace_numbers: Optional[str] = None,
+		verbose: bool = False
 ) -> List[List[Dict[str, Union[np.ndarray, str]]]]:
 	"""
 	Tokenize a corpus into tokens.
@@ -111,7 +113,7 @@ def tokenize_corpus(
 	Returns a list of lists of dictionaries with keys "tokens", "spans" and "lang".
 	"""
 	tokens = []
-	for d in tqdm(corpus_sents):
+	for d in tqdm(corpus_sents, disable=not verbose):
 		d_tokens = []
 		for sent in d:
 			text = sent["text"]
@@ -164,6 +166,7 @@ def lemmatize_corpus(
 		tokens: List[List[Dict[str, Union[np.ndarray, str]]]],
 		nlp_es: Any,
 		nlp_ca: Any,
+		verbose: bool = False
 ) -> List[List[Dict[str, Union[np.ndarray, str]]]]:
 	"""
 	Lemmatize a corpus.
@@ -180,7 +183,7 @@ def lemmatize_corpus(
 
 	# print("Lemmatizing...")
 	tokens_lemmatized = []
-	for d in tqdm(tokens):
+	for d in tqdm(tokens, disable=not verbose):
 		d_tokens = []
 		for sent in d:
 			lang = sent["lang"]
