@@ -264,6 +264,7 @@ def get_tokens(
 	present_sents = []
 	for s, sent in enumerate(doc_tokens):
 		spans = sent["spans"]
+		if not spans.size: continue
 		start2 = spans[:, 0]
 		end2 = spans[:, 1]
 		if truncate:
@@ -277,3 +278,13 @@ def get_tokens(
 	if return_indices:
 		return indices, present_sents
 	return np.concatenate([sent["tokens"][i] for i, sent in zip(indices, np.array(doc_tokens)[present_sents])]), present_sents
+
+def read_terms(
+		path: str
+) -> List[str]:
+	"""
+	Read a list of terms from a file.
+	"""
+	with open(path, 'r') as f:
+		terms = f.read().splitlines()
+	return terms
