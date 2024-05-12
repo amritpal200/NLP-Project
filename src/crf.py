@@ -1,6 +1,7 @@
 import pycrfsuite as crfs
 from preprocessing import *
 import os
+import nltk
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
 def put_bio(data, data_tokens, train_data_bio):
@@ -38,6 +39,9 @@ class CRF:
 			verbose: bool = False
 	):
 		self.model_path = model_path
+		self.nlp_es, self.nlp_ca = load_nlps()
+		self.nlp_es.disable_pipes('ner', 'parser')
+		self.nlp_ca.disable_pipes('ner', 'parser')
 
 		if os.path.exists(model_path):
 			self.tagger = crfs.Tagger()
@@ -62,11 +66,11 @@ class CRF:
 		"""
 		Returns a list of features for a given word in a sentence.
 		"""
-		word, _ = sent[i]
+		word, pos, _ = sent[i]
 		features = [
 			"bias",
 			"word=" + word,
-			
+			"pos=" + pos,
 		]
 
 		# add more features
@@ -89,7 +93,7 @@ class CRF:
 		"""
 		Returns a list of labels for each word in a sentence.
 		"""
-		return [label for _, label in sent]
+		return [label for _,_,label in sent]
 
 	def sent2tokens(
 			self,
@@ -98,7 +102,7 @@ class CRF:
 		"""
 		Returns a list of tokens in a sentence.
 		"""
-		return [token for token, _ in sent]
+		return [token for token,_,_ in sent]
 	
 	def train(
 			self,
@@ -116,10 +120,16 @@ class CRF:
 			train_labels = json.load(f)
 
 		sents = []
-		for doc_tokens, doc_labels in zip(train_data, train_labels):
+		for doc_tokens, doc_labels in tqdm(zip(train_data, train_labels), total=len(train_data)):
 			sent = []
-			for tokens, labels in zip(doc_tokens, doc_labels):
-				sent.extend(list(zip(tokens["tokens"], labels)))
+			for sentence, labels in zip(doc_tokens, doc_labels):
+				lang = sentence["lang"]
+				if lang == "ca":
+					doc = self.nlp_ca(" ".join(sentence["tokens"]))
+				else:
+					doc = self.nlp_es(" ".join(sentence["tokens"]))
+				pos = [token.pos_ for token in doc]
+				sent.extend(list(zip(sentence["tokens"], pos, labels)))
 			sents.append(sent)
 
 		X_train = [self.sent2features(sent) for sent in sents]
@@ -136,7 +146,9 @@ class CRF:
 
 	def predict(
 			self,
-			tokens: List[str]
+			tokens: List[str],
+			pos: Optional[List[str]] = None,
+			lang: Optional[str] = "es"
 	) -> List[Tuple[str, str]]:
 		"""
 		Predicts NER tags.
@@ -146,7 +158,13 @@ class CRF:
 			raise ValueError("Model not trained")
 
 		# convert tokens to List[Tuple[str, str]]
-		sent = [(token, "") for token in tokens]
+		if pos is None:
+			if lang == "ca":
+				doc = self.nlp_ca(" ".join(tokens))
+			else:
+				doc = self.nlp_es(" ".join(tokens))
+			pos = [token.pos_ for token in doc]
+		sent = [(token, p, "") for token,p in zip(tokens, pos)]
 		x = self.sent2features(sent)
 		y = self.tagger.tag(x)
 
