@@ -189,6 +189,8 @@ class EvalCRF(EvalModel):
 			eval_data_path: str,
 			load_existing_train_tokens: bool = False,
 			load_existing_eval_tokens: bool = False,
+			load_existing_train_pos: bool = False,
+			load_existing_eval_pos: bool = False,
 			**kwargs
 	):
 		super(EvalCRF, self).__init__(save_dir, results_dir, eval_data_path, load_existing_eval_tokens, **kwargs)
@@ -204,22 +206,23 @@ class EvalCRF(EvalModel):
 				remove_punctuation=kwargs.get("remove_punctuation", True),
 				replace_numbers=kwargs.get("replace_numbers", None)
 			)
-		with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'r', encoding='utf8') as _f:
-			train_data_bio = crf.create_bio_tags(self.train_data, json.load(_f))
+		train_data_bio = crf.create_bio_tags(self.train_data, load_tokens(os.path.join(self.save_dir, "train_data_tokens.json")))
 		with open(os.path.join(self.save_dir, "train_data_bio.json"), 'w', encoding='utf8') as _f:
 			json.dump(train_data_bio, _f)
-		if self.verbose: print("Precomputing training POS tags...")
-		crf.precompute_pos(
-			tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
-			pos_path=os.path.join(self.save_dir, "train_data_pos.json"),
-			verbose=self.verbose
-		)
-		if self.verbose: print("Precomputing evaluation POS tags...")
-		crf.precompute_pos(
-			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
-			pos_path=os.path.join(self.save_dir, "data_pos.json"),
-			verbose=self.verbose
-		)
+		if not load_existing_train_pos:
+			if self.verbose: print("Precomputing training POS tags...")
+			crf.precompute_pos(
+				tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
+				pos_path=os.path.join(self.save_dir, "train_data_pos.json"),
+				verbose=self.verbose
+			)
+		if not load_existing_eval_pos:
+			if self.verbose: print("Precomputing evaluation POS tags...")
+			crf.precompute_pos(
+				tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
+				pos_path=os.path.join(self.save_dir, "data_pos.json"),
+				verbose=self.verbose
+			)
 		if self.verbose: print("Loading NLP models...")
 		self.nlps = load_nlps()
 		self.name = "CRF"
@@ -236,8 +239,11 @@ class EvalCRF(EvalModel):
 
 	def evaluate(self, **kwargs) -> dict:
 		if self.verbose: print("Instantiating CRF...")
+		# delete previous model
+		if os.path.exists(os.path.join(self.save_dir, "crf_0_0.crfsuite")):
+			os.remove(os.path.join(self.save_dir, "crf_0_0.crfsuite"))
 		self.model = crf.CRF(
-			model_path=os.path.join(self.save_dir, "crf_0_0"), # TODO: allow multiple models
+			model_path=os.path.join(self.save_dir, "crf_0_0.crfsuite"), # TODO: allow multiple models
 			trainer_params=kwargs,
 			nlps=self.nlps,
 			verbose=self.verbose
@@ -253,6 +259,41 @@ class EvalCRF(EvalModel):
 		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
 		hyperparams["replace_numbers"] = self.kwargs.get("replace_numbers", None)
 		return super(EvalCRF, self).evaluate(**hyperparams)
+	
+	def grid_search(
+			self,
+			params_ranges: dict
+	) -> List[dict]:
+		"""
+		Perform grid search over the hyperparameters.
+		"""
+		combinations = [] # here we will store params and metrics
+		keys = list(params_ranges.keys())
+		values = list(params_ranges.values())
+		indexes = [0] * len(keys)
+		total = 1
+		for v in values:
+			total *= len(v)
+		p = 0
+		while True:
+			print(f"Progress: {p}/{total}", end="\r")
+			p += 1
+			params = {keys[i]: values[i][indexes[i]] for i in range(len(keys))}
+			metrics = self.evaluate(**params)
+			combinations.append({"params": params, "metrics": metrics})
+			i = 0
+			while i < len(keys):
+				indexes[i] += 1
+				if indexes[i] == len(values[i]):
+					indexes[i] = 0
+					i += 1
+				else:
+					break
+			if i == len(keys):
+				break
+		print(f"Progress: {total}/{total}")
+		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
+
 
 if __name__ == "__main__":
 	with open(os.path.join(ROOT_DIR, "data", 'test_data.json'), 'r', encoding='utf8') as _f:
