@@ -139,32 +139,33 @@ class CRF:
 
 		pad_token = "<PAD>"
 		if self.padding:
-			# Ensure there are always six bigram features, use padding if necessary
-			for j in range(1, 7):  # Always attempt to generate six bigrams
+			# Ensure there are always self.before_lim bigram features, use padding if necessary
+			for j in range(1, self.before_lim + 1):  # Generate bigrams up to self.before_lim
 				if idx >= j:
 					prev_word = sent[idx - j][0]
 				else:
 					prev_word = pad_token  # Use padding token if there are not enough previous words
-			current_bigram = f"2GRAMBEFORE_{j}={prev_word}_{word}"
-			features.append(current_bigram)
+				current_bigram = f"2GRAMBEFORE_{j}={prev_word}_{word}"
+				features.append(current_bigram)
 
 		else:
-			# Adding bigram features for up to 6 words before the current word
-			for j in range(max(0, idx-6), idx):
+			# Adding bigram features for up to self.before_lim words before the current word
+			for j in range(max(0, idx-self.before_lim), idx):
 				if idx > 0 and j < idx:  # Check to ensure there is a previous word to form a bigram
 					prev_word = sent[j][0]
-				current_bigram = f"2GRAMBEFORE={prev_word}_{word}"
-			features.append(current_bigram)
+					current_bigram = f"2GRAMBEFORE={prev_word}_{word}"
+					features.append(current_bigram)
 
-		# Add a bigram feature for the word after the current word
-		if idx + 1 < len(sent):
-			next_word = sent[idx + 1][0]
-			current_bigram_after = f"2GRAMAFTER={word}_{next_word}"
-			features.append(current_bigram_after)
-		elif self.padding:
-			next_word = pad_token  # Use padding token if there is no next word
-			current_bigram_after = f"2GRAMAFTER={word}_{next_word}"
-			features.append(current_bigram_after)
+		# Add bigram features for up to self.after_lim words after the current word
+		for j in range(1, self.after_lim + 1):
+			if idx + j < len(sent):
+				next_word = sent[idx + j][0]
+				current_bigram_after = f"2GRAMAFTER_{j}={word}_{next_word}"
+				features.append(current_bigram_after)
+			elif self.padding:
+				next_word = pad_token  # Use padding token if there is no next word
+				current_bigram_after = f"2GRAMAFTER_{j}={word}_{next_word}"
+				features.append(current_bigram_after)
 
 		# beforepos
 		for i in range(1, self.before_lim + 1):
