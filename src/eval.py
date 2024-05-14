@@ -157,10 +157,12 @@ class EvalModel(EvalOfficial):
 			"f1": f1,
 			"time": round(total_time, 4)
 		}
-		self.save_results(
-			metrics,
-			kwargs
-		)
+		if kwargs.get("save_results", True):
+			kwargs.pop("save_results", None)
+			self.save_results(
+				metrics,
+				kwargs
+			)
 		return metrics
 
 class EvalNegex(EvalModel):
@@ -244,7 +246,7 @@ class EvalCRF(EvalModel):
 			os.remove(os.path.join(self.save_dir, "crf_0_0.crfsuite"))
 		self.model = crf.CRF(
 			model_path=os.path.join(self.save_dir, "crf_0_0.crfsuite"), # TODO: allow multiple models
-			trainer_params=kwargs,
+			trainer_params={k: v for k, v in kwargs.items() if k != "save_results"},
 			nlps=self.nlps,
 			verbose=self.verbose
 		)
@@ -293,6 +295,86 @@ class EvalCRF(EvalModel):
 				break
 		print(f"Progress: {total}/{total}")
 		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
+
+	def cross_validation(
+			self,
+			n_splits: int,
+			**kwargs
+	) -> dict:
+		# save original data
+		original_train_data_path = self.train_data_path
+		original_eval_data_path = self.eval_data_path
+		original_train_data = self.train_data.copy()
+		with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'r', encoding='utf8') as _f:
+			original_train_data_tokens = json.load(_f)
+		with open(os.path.join(self.save_dir, "train_data_bio.json"), 'r', encoding='utf8') as _f:
+			original_train_data_bio = json.load(_f)
+		with open(os.path.join(self.save_dir, "train_data_pos.json"), 'r', encoding='utf8') as _f:
+			original_train_data_pos = json.load(_f)
+		with open(os.path.join(self.save_dir, "data_tokens.json"), 'r', encoding='utf8') as _f:
+			original_eval_data_tokens = json.load(_f)
+		with open(os.path.join(self.save_dir, "data_pos.json"), 'r', encoding='utf8') as _f:
+			original_eval_data_pos = json.load(_f)
+
+		# split, save and evaluate
+		total_docs = len(self.train_data)
+		split_size = total_docs // n_splits
+		split_idxs = [i * split_size for i in range(n_splits)] + [total_docs]
+		results = []
+		for i in range(n_splits):
+			self.train_data_path = os.path.join(self.save_dir, "train_data.json")
+			self.eval_data_path = os.path.join(self.save_dir, "data.json")
+			self.data_path = self.eval_data_path
+			with open(self.train_data_path, 'w', encoding='utf8') as _f:
+				json.dump(original_train_data[:split_idxs[i]] + original_train_data[split_idxs[i+1]:], _f)
+			with open(self.data_path, 'w', encoding='utf8') as _f:
+				json.dump(original_train_data[split_idxs[i]:split_idxs[i+1]], _f)
+			with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'w', encoding='utf8') as _f:
+				json.dump(original_train_data_tokens[:split_idxs[i]] + original_train_data_tokens[split_idxs[i+1]:], _f)
+			with open(os.path.join(self.save_dir, "train_data_bio.json"), 'w', encoding='utf8') as _f:
+				json.dump(original_train_data_bio[:split_idxs[i]] + original_train_data_bio[split_idxs[i+1]:], _f)
+			with open(os.path.join(self.save_dir, "train_data_pos.json"), 'w', encoding='utf8') as _f:
+				json.dump(original_train_data_pos[:split_idxs[i]] + original_train_data_pos[split_idxs[i+1]:], _f)
+			with open(os.path.join(self.save_dir, "data_tokens.json"), 'w', encoding='utf8') as _f:
+				json.dump(original_train_data_tokens[split_idxs[i]:split_idxs[i+1]], _f)
+			with open(os.path.join(self.save_dir, "data_pos.json"), 'w', encoding='utf8') as _f:
+				json.dump(original_train_data_pos[split_idxs[i]:split_idxs[i+1]], _f)
+			results.append(self.evaluate(**kwargs, save_results=False))
+		
+		# return data to original state
+		os.remove(self.train_data_path)
+		os.remove(self.eval_data_path)
+		self.train_data_path = original_train_data_path
+		self.eval_data_path = original_eval_data_path
+		self.data_path = self.eval_data_path
+		with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'w', encoding='utf8') as _f:
+			json.dump(original_train_data_tokens, _f)
+		with open(os.path.join(self.save_dir, "train_data_bio.json"), 'w', encoding='utf8') as _f:
+			json.dump(original_train_data_bio, _f)
+		with open(os.path.join(self.save_dir, "train_data_pos.json"), 'w', encoding='utf8') as _f:
+			json.dump(original_train_data_pos, _f)
+		with open(os.path.join(self.save_dir, "data_tokens.json"), 'w', encoding='utf8') as _f:
+			json.dump(original_eval_data_tokens, _f)
+		with open(os.path.join(self.save_dir, "data_pos.json"), 'w', encoding='utf8') as _f:
+			json.dump(original_eval_data_pos, _f)		
+
+		cv_results = {
+			"results": results,
+			"avg_precision": sum([r["precision"] for r in results]) / n_splits,
+			"avg_recall": sum([r["recall"] for r in results]) / n_splits,
+			"avg_f1": sum([r["f1"] for r in results]) / n_splits,
+			"avg_time": sum([r["time"] for r in results]) / n_splits
+		}
+		self.save_results(
+			{
+				"precision": cv_results["avg_precision"],
+				"recall": cv_results["avg_recall"],
+				"f1": cv_results["avg_f1"],
+				"time": cv_results["avg_time"]
+			},
+			kwargs
+		)
+		return cv_results
 
 
 if __name__ == "__main__":
