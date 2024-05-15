@@ -3,4 +3,11 @@
 *__pycache__/
 *.pyc
 temp
-latex/
+latex/*
+!latex/images/
+!latex/*.bib
+!latex/*.pdf
+!latex/*.tex
+models/*0_*
+*pruebas.ipynb
+*pruebas.py

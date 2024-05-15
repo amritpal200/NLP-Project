@@ -20,7 +20,7 @@ def fordward_scope(tagged_text, start_index):
     end_index = start_index
     tagger_checker = tagged_text[end_index]
     
-    # Loop until "." is found or end of tagged_sentence
+    # Loop until "." is found or end of tagged_text
     while tagger_checker !="." and end_index != len(tagged_text)-1:
         end_index += 1
         tagger_checker = tagged_text[end_index]

@@ -1,16 +1,15 @@
 {
-	"BlindNegex": [
-		{
-			"metrics": {
-				"precision": 0.8211420882702232,
-				"recall": 0.8211420882702232,
-				"f1": 0.8211420882702232,
-				"time": 0.8621091842651367
-			},
-			"hyperparameters": {
-			}
-		}
-	],
+    "BlindNegex": [
+        {
+            "metrics": {
+                "precision": 0.8211420882702232,
+                "recall": 0.8211420882702232,
+                "f1": 0.8211420882702232,
+                "time": 0.8621091842651367
+            },
+            "hyperparameters": {}
+        }
+    ],
     "Negex": [
         {
             "metrics": {
@@ -164,6 +163,534 @@
             },
             "hyperparameters": {
                 "max_context_size": 14
+            }
+        }
+    ],
+    "CRF": [
+        {
+            "metrics": {
+                "precision": 0.9649136248528155,
+                "recall": 0.9649136248528155,
+                "f1": 0.9649136248528155,
+                "time": 0.8275
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 0.1,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9667282287852638,
+                "recall": 0.9667282287852638,
+                "f1": 0.9667282287852638,
+                "time": 0.8275
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9668290401148443,
+                "recall": 0.9668290401148443,
+                "f1": 0.9668290401148443,
+                "time": 0.7628
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9664701517815378,
+                "recall": 0.9664701517815378,
+                "f1": 0.9664701517815378,
+                "time": 0.8611
+            },
+            "hyperparameters": {
+                "c1": 0.0001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9654701033920996,
+                "recall": 0.9654701033920996,
+                "f1": 0.9654701033920996,
+                "time": 0.8237
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 0.1,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9634780715195896,
+                "recall": 0.9634780715195896,
+                "f1": 0.9634780715195896,
+                "time": 0.8242
+            },
+            "hyperparameters": {
+                "c1": 0.0001,
+                "c2": 0.1,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.961546526444828,
+                "recall": 0.961546526444828,
+                "f1": 0.961546526444828,
+                "time": 0.8555
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 0.01,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9562922399470942,
+                "recall": 0.9562922399470942,
+                "f1": 0.9562922399470942,
+                "time": 0.7978
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 0.01,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9534856525315741,
+                "recall": 0.9534856525315741,
+                "f1": 0.9534856525315741,
+                "time": 0.8334
+            },
+            "hyperparameters": {
+                "c1": 0.0001,
+                "c2": 0.01,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9704703453392907,
+                "recall": 0.9704703453392907,
+                "f1": 0.9704703453392907,
+                "time": 0.7312
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.970220333241931,
+                "recall": 0.970220333241931,
+                "f1": 0.970220333241931,
+                "time": 0.8182
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 3,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9704017936351759,
+                "recall": 0.9704017936351759,
+                "f1": 0.9704017936351759,
+                "time": 0.6163
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 3,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9665346710324693,
+                "recall": 0.9665346710324693,
+                "f1": 0.9665346710324693,
+                "time": 0.8385
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 6,
+                "after_lim": 2,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9670346952271884,
+                "recall": 0.9670346952271884,
+                "f1": 0.9670346952271884,
+                "time": 0.8409
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 2,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9695549784667,
+                "recall": 0.9695549784667,
+                "f1": 0.9695549784667,
+                "time": 0.7099
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": true,
+                "before_lim": 3,
+                "after_lim": 2,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9708453634853299,
+                "recall": 0.9708453634853299,
+                "f1": 0.9708453634853299,
+                "time": 0.7123
+            },
+            "hyperparameters": {
+                "c1": 0.001,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 3,
+                "after_lim": 2,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9683210477926352,
+                "recall": 0.9683210477926352,
+                "f1": 0.9683210477926352,
+                "time": 0.9288
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 8,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9700751649273351,
+                "recall": 0.9700751649273351,
+                "f1": 0.9700751649273351,
+                "time": 0.8141
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9700630675677855,
+                "recall": 0.9700630675677855,
+                "f1": 0.9700630675677855,
+                "time": 1.0461
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 4,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9666314499088665,
+                "recall": 0.9666314499088665,
+                "f1": 0.9666314499088665,
+                "time": 0.9761
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 10,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9707284223430166,
+                "recall": 0.9707284223430166,
+                "f1": 0.9707284223430166,
+                "time": 0.6061
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 2,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9675629465941901,
+                "recall": 0.9675629465941901,
+                "f1": 0.9675629465941901,
+                "time": 0.7275
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 0,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9695146539348678,
+                "recall": 0.9695146539348678,
+                "f1": 0.9695146539348678,
+                "time": 0.8284
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 2,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9677121473619691,
+                "recall": 0.9677121473619691,
+                "f1": 0.9677121473619691,
+                "time": 0.911
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 3,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9680468409761762,
+                "recall": 0.9680468409761762,
+                "f1": 0.9680468409761762,
+                "time": 0.9113
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 4,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9734027514292236,
+                "recall": 0.9734027514292236,
+                "f1": 0.9734027514292236,
+                "time": 0.92756
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 50,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 1
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9725630714777236,
+                "recall": 0.9725630714777236,
+                "f1": 0.9725630714777236,
+                "time": 0.91342
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 100,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 1
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9705290078028423,
+                "recall": 0.9705290078028423,
+                "f1": 0.9705290078028423,
+                "time": 1.2396
+            },
+            "hyperparameters": {
+                "c1": 0.01,
+                "c2": 1.0,
+                "max_iterations": 100,
+                "padding": false,
+                "before_lim": 6,
+                "after_lim": 1,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
             }
         }
     ]
