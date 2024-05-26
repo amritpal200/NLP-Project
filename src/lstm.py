@@ -65,36 +65,34 @@ class SlidingWindowDataset(Dataset):
 		self.pos_encoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
 		self.pos_encoder.fit(np.array(list(self.pos2idx.values())).reshape(-1, 1))
 
-	def pad(self, tokens, lemmas, pos, labels):
+	def pad(self, tokens, lemmas, pos):
 		# Pad if shorter than seq_len
 		if len(tokens) < self.seq_len:
 			tokens = np.pad(tokens, (0, self.seq_len - len(tokens)), "constant", constant_values=self.padding_value)
 			lemmas = np.pad(lemmas, (0, self.seq_len - len(lemmas)), "constant", constant_values=self.padding_value)
 			pos = np.pad(pos, (0, self.seq_len - len(pos)), "constant", constant_values=self.padding_value)
-			labels = np.pad(labels, (0, self.seq_len - len(labels)), "constant", constant_values=self.padding_value)
-		return tokens, lemmas, pos, labels
+		return tokens, lemmas, pos
 
-	def get_vectors(self, tokens, lemmas, pos, labels):
+	def get_vectors(self, tokens, lemmas, pos, label):
 		token_embeddings = np.array([self.ft.get_word_vector(token) for token in tokens])
 		lemma_embeddings = np.array([self.ft.get_word_vector(lemma) for lemma in lemmas])
 		pos_indices = np.array([self.pos2idx.get(p, 16) for p in pos]).reshape(-1, 1)
 		pos_one_hot = self.pos_encoder.transform(pos_indices)
-		label_indices = np.array([self.label2idx.get(label, 8) for label in labels])
+		label_idx = self.label2idx.get(label, 8)
 
 		x = np.concatenate((token_embeddings, lemma_embeddings, pos_one_hot), axis=1)
-		y = label_indices
+		y = label_idx
 		return x, y
 	
-	def getseq(self, start, end):
+	def getseq(self, idx, start, end):
 		tokens = self.data_tokens[start:end]
 		lemmas = self.data_lemmas[start:end]
 		pos = self.data_pos[start:end]
-		labels = self.data_labels[start:end]
 
-		tokens, lemmas, pos, labels = self.pad(tokens, lemmas, pos, labels)
+		tokens, lemmas, pos = self.pad(tokens, lemmas, pos)
 
-		x, y = self.get_vectors(tokens, lemmas, pos, labels)
-		return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+		x, y = self.get_vectors(tokens, lemmas, pos, self.data_labels[idx])
+		return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
 
 class OverlappingWindowDataset(SlidingWindowDataset):
 	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
@@ -107,7 +105,7 @@ class OverlappingWindowDataset(SlidingWindowDataset):
 		# get sequence around the idx
 		start = max(0, idx - self.seq_len//2)
 		end = min(len(self.data_tokens), idx + self.seq_len//2)
-		return self.getseq(start, end)
+		return self.getseq(idx, start, end)
 	
 class NonOverlappingWindowDataset(SlidingWindowDataset):
 	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
@@ -120,7 +118,7 @@ class NonOverlappingWindowDataset(SlidingWindowDataset):
 		# get sequence around the idx
 		start = idx * self.seq_len
 		end = start + self.seq_len
-		return self.getseq(start, end)
+		return self.getseq(idx, start, end)
 
 class NegationDetectionModel(nn.Module):
 	def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
@@ -129,11 +127,14 @@ class NegationDetectionModel(nn.Module):
 		# BiLSTM Layer
 		self.bilstm = nn.LSTM(input_dim, hidden_dim, num_layers, bidirectional=True, batch_first=True)
 		# Dense Layer
-		self.fc = nn.Linear(hidden_dim * 2, output_dim) # hidden_dim * 2 is done because is BIdirectional. Hence, we have the double dimensions
+		self.fc = nn.Linear(hidden_dim * 2, output_dim) # 2 for concatenating both directions
 		
 	def forward(self, word_embeds):
-		lstm_out, _ = self.bilstm(word_embeds)
-		out = self.fc(lstm_out)
+		bilstm_out, _ = self.bilstm(word_embeds)
+		forward_last = bilstm_out[:, -1, :300]
+		backward_last = bilstm_out[:, 0, 300:]
+		concat = torch.cat((forward_last, backward_last), dim=1)
+		out = self.fc(concat)
 		return out
 
 class LSTM:
@@ -253,8 +254,10 @@ class LSTM:
 		predictions = []
 		for sequences, _ in temp_dataloader:
 			outputs = self.forward(sequences)
-			_, predicted = torch.max(outputs, 2)
+			_, predicted = torch.max(outputs, 1)
 			predicted = predicted.squeeze().tolist()
+			if isinstance(predicted, int):
+				predicted = [predicted]
 			predictions.extend([idx2label[p] for p in predicted])
 		return predictions
 	
