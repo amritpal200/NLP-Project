@@ -81,7 +81,7 @@ class SlidingWindowDataset(Dataset):
 		tokens, lemmas, pos, labels = self.pad(tokens, lemmas, pos, labels)
 
 		x, y = self.get_vectors(tokens, lemmas, pos, labels)
-		return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
+		return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
 
 class OverlappingWindowDataset(SlidingWindowDataset):
 	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
