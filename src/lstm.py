@@ -106,19 +106,6 @@ class OverlappingWindowDataset(SlidingWindowDataset):
 		start = max(0, idx - self.seq_len//2)
 		end = min(len(self.data_tokens), idx + self.seq_len//2)
 		return self.getseq(idx, start, end)
-	
-class NonOverlappingWindowDataset(SlidingWindowDataset):
-	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
-		super().__init__(data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len, padding_value)
-
-	def __len__(self):
-		return (len(self.data_tokens) + self.seq_len - 1) // self.seq_len
-
-	def __getitem__(self, idx):
-		# get sequence around the idx
-		start = idx * self.seq_len
-		end = start + self.seq_len
-		return self.getseq(idx, start, end)
 
 class NegationDetectionModel(nn.Module):
 	def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
@@ -177,7 +164,6 @@ class LSTM:
 		self.batch_size = self.hyperparams.get("batch_size", 32)
 		self.lr = self.hyperparams.get("lr", 0.001)
 		self.num_workers = self.hyperparams.get("num_workers", 0)
-		self.dataset_type = self.hyperparams.get("dataset_type", "overlapping")
 	
 	def train(
 			self,
@@ -195,10 +181,7 @@ class LSTM:
 
 		if self.verbose: print("Preparing training set...")
 		train_data = load_data(train_tokens_path, train_lemmas_path, train_pos_path, train_labels_path, frac=frac)
-		if self.dataset_type == "overlapping":
-			train_dataset = OverlappingWindowDataset(*train_data, self.ft, self.seq_len, self.padding_value)
-		elif self.dataset_type == "non-overlapping":
-			train_dataset = NonOverlappingWindowDataset(*train_data, self.ft, self.seq_len, self.padding_value)
+		train_dataset = OverlappingWindowDataset(*train_data, self.ft, self.seq_len, self.padding_value)
 		train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 		
 		criterion = nn.CrossEntropyLoss()
@@ -244,10 +227,7 @@ class LSTM:
 	) -> List[str]:
 		labels = ["O"] * len(tokens)
 		tokens = {"tokens": tokens}
-		if self.dataset_type == "overlapping":
-			temp_dataset = OverlappingWindowDataset([[tokens]], [[lemmas]], [[pos]], [[labels]], self.ft, self.seq_len, self.padding_value)
-		elif self.dataset_type == "non-overlapping":
-			temp_dataset = NonOverlappingWindowDataset([[tokens]], [[lemmas]], [[pos]], [[labels]], self.ft, self.seq_len, self.padding_value)
+		temp_dataset = OverlappingWindowDataset([[tokens]], [[lemmas]], [[pos]], [[labels]], self.ft, self.seq_len, self.padding_value)
 		temp_dataloader = DataLoader(temp_dataset, batch_size=1, shuffle=False, num_workers=0)
 		idx2label = {v: k for k, v in temp_dataset.label2idx.items()}
 
@@ -275,10 +255,7 @@ class LSTM:
 
 		if self.verbose: print("Preparing test set...")
 		test_data = load_data(test_tokens_path, test_lemmas_path, test_pos_path, test_labels_path, frac=frac)
-		if self.dataset_type == "overlapping":
-			test_dataset = OverlappingWindowDataset(*test_data, self.ft, self.seq_len, self.padding_value)
-		elif self.dataset_type == "non-overlapping":
-			test_dataset = NonOverlappingWindowDataset(*test_data, self.ft, self.seq_len, self.padding_value)
+		test_dataset = OverlappingWindowDataset(*test_data, self.ft, self.seq_len, self.padding_value)
 		test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 		
 		criterion = nn.CrossEntropyLoss()
@@ -331,15 +308,33 @@ class LSTM:
 		if not os.path.exists(save_dir):
 			os.makedirs(save_dir)
 
+		data_labels = [[["O"] * len(sent["tokens"]) for sent in doc] for doc in data_tokens]
+		dataset = OverlappingWindowDataset(data_tokens, data_lemmas, data_pos, data_labels, self.ft, self.seq_len, self.padding_value)
+		dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
+		idx2label = {v: k for k, v in dataset.label2idx.items()}
+
+		self.model.eval()
+		predictions = []
+
+		with torch.no_grad():
+			for sequences, _ in tqdm(dataloader, disable=not self.verbose):
+				outputs = self.forward(sequences)
+				_, predicted = torch.max(outputs, 1)
+				predicted = predicted.squeeze().tolist()
+				if isinstance(predicted, int):
+					predicted = [predicted]
+				predictions.extend([idx2label[p] for p in predicted])
+
+		# reshape preds to match data structure
 		preds = []
-		for d, (doc_tokens, doc_lemmas, doc_pos) in tqdm(enumerate(zip(data_tokens, data_lemmas, data_pos)),\
-													total=len(data_tokens), disable=not self.verbose):
-			doc_results = []
-			for i, (sentence, lemmas, pos) in enumerate(zip(doc_tokens, doc_lemmas, doc_pos)):
-				tokens = sentence["tokens"]
-				labels = self.predict(tokens, lemmas, pos)
-				doc_results.append(labels)
-			preds.append(doc_results)
+		for i in range(len(data_tokens)):
+			doc_preds = []
+			for j in range(len(data_tokens[i])):
+				sent_preds = []
+				for k in range(len(data_tokens[i][j]["tokens"])):
+					sent_preds.append(predictions.pop(0))
+				doc_preds.append(sent_preds)
+			preds.append(doc_preds)
 
 		# Save preds to formated predictions
 		tags = {"B-NEG": "NEG", "I-NEG": "NEG", "B-NSCO": "NSCO", "I-NSCO": "NSCO",\
