@@ -6,6 +6,7 @@ import negex, crf, lstm
 from time import time
 import random
 import fasttext
+import torch
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
 
@@ -269,6 +270,8 @@ class EnhancedEvalModel(EvalModel):
 				if params not in [c["params"] for c in combinations]:
 					break
 			metrics = self.evaluate(**params)
+			if isinstance(metrics, tuple):
+				metrics, _ = metrics
 			combinations.append({"params": params, "metrics": metrics})
 		
 		print(f"Progress: {n_iter}/{n_iter}")
@@ -424,6 +427,7 @@ class EvalLSTM(EnhancedEvalModel):
 			results_dir: str,
 			train_data_path: str,
 			eval_data_path: str,
+			device: torch.device,
 			fasttext_model: Optional[fasttext.FastText._FastText] = None,
 			load_existing_train_tokens: bool = False,
 			load_existing_eval_tokens: bool = False,
@@ -455,6 +459,7 @@ class EvalLSTM(EnhancedEvalModel):
 		else:
 			self.ft = fasttext_model
 
+		self.device = device
 		self.name = "LSTM"
 
 	def predict(self, **kwargs) -> None:
@@ -466,14 +471,14 @@ class EvalLSTM(EnhancedEvalModel):
 			pos_path=os.path.join(self.save_dir, "data_pos.json")
 		)
 
-	def evaluate(self, device, **kwargs) -> Tuple[dict, List[float]]:
+	def evaluate(self, **kwargs) -> Tuple[dict, List[float]]:
 		if self.verbose: print("Instantiating LSTM...")
 		# delete previous model
 		if os.path.exists(os.path.join(self.save_dir, "lstm_0_0.pt")):
 			os.remove(os.path.join(self.save_dir, "lstm_0_0.pt"))
 		self.model = lstm.LSTM(
 			model_path=os.path.join(self.save_dir, "lstm_0_0.pt"),
-			device=device,
+			device=self.device,
 			hyperparams={k: v for k, v in kwargs.items() if k != "save_results"},
 			ft=self.ft,
 			verbose=self.verbose
