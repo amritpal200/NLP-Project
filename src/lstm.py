@@ -289,7 +289,7 @@ class LSTM:
 		total = 0
 		
 		with torch.no_grad():
-			for sequences, targets in tqdm(test_dataloader):
+			for sequences, targets in tqdm(test_dataloader, disable=not self.verbose):
 				# Forward pass
 				sequences = sequences.to(self.device)
 				targets = targets.to(self.device)
@@ -316,11 +316,78 @@ class LSTM:
 			self,
 			data_path: str,
 			tokens_path: str,
-			pos_path: str,
 			lemmas_path: str,
+			pos_path: str,
 			save_path: str,
 	) -> None:
-		raise NotImplementedError
+		with open(data_path, "r") as f:
+			data = json.load(f)
+		data_tokens = load_tokens(tokens_path)
+		with open(lemmas_path, "r") as f:
+			data_lemmas = json.load(f)
+		with open(pos_path, "r") as f:
+			data_pos = json.load(f)
+		save_dir = os.path.dirname(save_path)
+		if not os.path.exists(save_dir):
+			os.makedirs(save_dir)
+
+		preds = []
+		for d, (doc_tokens, doc_lemmas, doc_pos) in tqdm(enumerate(zip(data_tokens, data_lemmas, data_pos)),\
+													total=len(data_tokens), disable=not self.verbose):
+			doc_results = []
+			for i, (sentence, lemmas, pos) in enumerate(zip(doc_tokens, doc_lemmas, doc_pos)):
+				tokens = sentence["tokens"]
+				labels = self.predict(tokens, lemmas, pos)
+				doc_results.append(labels)
+			preds.append(doc_results)
+
+		# Save preds to formated predictions
+		tags = {"B-NEG": "NEG", "I-NEG": "NEG", "B-NSCO": "NSCO", "I-NSCO": "NSCO",\
+		  		"B-UNC": "UNC", "I-UNC": "UNC", "B-USCO": "USCO", "I-USCO": "USCO"}
+		predictions = []
+		for d, doc_preds in enumerate(preds):
+			doc_results = []
+			for s, sent_preds in enumerate(doc_preds):
+				tag = None
+				for i, label in enumerate(sent_preds):
+					if tags.get(label, ".") != tag:
+						if tag is not None:
+							doc_results.append({
+								"value": {
+									"start": int(start),
+									"end": int(end),
+									"labels": [tag]
+								}
+							})
+						start = None
+						end = None
+						tag = None
+					if label == "O":
+						continue
+					if start is None:
+						start, end = data_tokens[d][s]["spans"][i]
+						tag = tags[label]
+					else:
+						end = data_tokens[d][s]["spans"][i][1]
+				if tag is not None:
+					doc_results.append({
+						"value": {
+							"start": int(start),
+							"end": int(end),
+							"labels": [tag]
+						}
+					})
+			predictions.append([
+				{
+					"result": doc_results
+				}
+			])
+		
+		for d in range(len(data)):
+			data[d]["predictions"] = predictions[d]
+
+		with open(save_path, "w") as f:
+			json.dump(data, f, indent=4)
 
 	def save(self) -> None:
 		model_dir = os.path.dirname(self.model_path)
