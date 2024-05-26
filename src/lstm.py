@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
 import numpy as np
 import fasttext
 import fasttext.util
@@ -109,3 +110,71 @@ class NonOverlappingWindowDataset(SlidingWindowDataset):
 		end = start + self.seq_len
 		return self.getseq(start, end)
 
+class NegationDetectionModel(nn.Module):
+	def __init__(self, word_embedding_dim, hidden_dim, num_layers, output_dim):
+		super(NegationDetectionModel, self).__init__()
+		
+		# BiLSTM Layer
+		self.bilstm = nn.LSTM(word_embedding_dim, hidden_dim, num_layers, bidirectional=True, batch_first=True)
+		# Dense Layer
+		self.fc = nn.Linear(hidden_dim * 2, output_dim) # hidden_dim * 2 is done because is BIdirectional. Hence, we have the double dimensions
+		
+	def forward(self, word_embeds):
+		lstm_out, _ = self.bilstm(word_embeds)
+		out = self.fc(lstm_out)
+		return out
+
+def train(model, dataloader, criterion, optimizer, device, epochs=10):
+	losses = []
+	for epoch in range(epochs):
+		for sequences, targets in tqdm(dataloader):
+			# Forward pass
+			sequences = sequences.to(device)
+			targets = targets.to(device)
+
+			outputs = model(sequences)
+			outputs = outputs.view(-1, outputs.shape[-1])
+			targets = targets.view(-1).long()
+			# Compute loss
+			loss = criterion(outputs, targets)
+			
+			# Backward pass and optimization
+			optimizer.zero_grad()
+			loss.backward()
+			optimizer.step()
+			losses.append(loss.item())
+			
+		print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+	return losses
+
+def test(model, dataloader, criterion, device):
+    model.eval()
+    total_loss = 0
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for sequences, targets in tqdm(dataloader):
+            # Forward pass
+            sequences = sequences.to(device)
+            targets = targets.to(device)
+            
+            outputs = model(sequences)
+            outputs = outputs.view(-1, outputs.shape[-1])
+            targets = targets.view(-1).long()
+            
+            # Compute loss
+            loss = criterion(outputs, targets)
+            total_loss += loss.item()
+            
+            # Compute accuracy
+            _, predicted = torch.max(outputs, 1)
+            correct += (predicted == targets).sum().item()
+            total += targets.size(0)
+    
+    average_loss = total_loss / len(dataloader)
+    accuracy = correct / total
+    
+    print(f'Test Loss: {average_loss:.4f}, Test Accuracy: {accuracy:.4f}')
+    
+    return average_loss, accuracy
