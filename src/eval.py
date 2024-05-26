@@ -4,6 +4,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 from preprocessing import *
 import negex, crf, lstm
 from time import time
+import fasttext
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
 
@@ -398,6 +399,7 @@ class EvalLSTM(EnhancedEvalModel):
 			results_dir: str,
 			train_data_path: str,
 			eval_data_path: str,
+			fasttext_model: Optional[fasttext.FastText._FastText] = None,
 			load_existing_train_tokens: bool = False,
 			load_existing_eval_tokens: bool = False,
 			load_existing_train_pos: bool = False,
@@ -422,8 +424,47 @@ class EvalLSTM(EnhancedEvalModel):
 				lemmas_path=os.path.join(self.save_dir, "data_lemmas.json"),
 				verbose=self.verbose
 			)
+		if fasttext_model is None:
+			if self.verbose: print("Loading FastText model...")
+			self.ft = lstm.load_fasttext()
+		else:
+			self.ft = fasttext_model
 
+		self.name = "LSTM"
 
+	def predict(self, **kwargs) -> None:
+		self.model.process(
+			data_path=self.data_path,
+			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
+			lemmas_path=os.path.join(self.save_dir, "data_lemmas.json"),
+			save_path=os.path.join(self.save_dir, "data_predictions.json"),
+			pos_path=os.path.join(self.save_dir, "data_pos.json")
+		)
+
+	def evaluate(self, device, **kwargs) -> Tuple[dict, List[float]]:
+		if self.verbose: print("Instantiating LSTM...")
+		# delete previous model
+		if os.path.exists(os.path.join(self.save_dir, "lstm_0_0.pt")):
+			os.remove(os.path.join(self.save_dir, "lstm_0_0.pt"))
+		self.model = lstm.LSTM(
+			model_path=os.path.join(self.save_dir, "lstm_0_0.pt"),
+			device=device,
+			hyperparams={k: v for k, v in kwargs.items() if k != "save_results"},
+			ft=self.ft,
+			verbose=self.verbose
+		)
+		if self.verbose: print("Training LSTM...")
+		losses = self.model.train(
+			train_tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
+			train_lemmas_path=os.path.join(self.save_dir, "train_data_lemmas.json"),
+			train_labels_path=os.path.join(self.save_dir, "train_data_bio.json"),
+			train_pos_path=os.path.join(self.save_dir, "train_data_pos.json")
+		)
+		hyperparams = kwargs
+		hyperparams["lemmatize"] = self.kwargs.get("lemmatize", False)
+		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
+		hyperparams["replace_numbers"] = self.kwargs.get("replace_numbers", None)
+		return super(EvalLSTM, self).evaluate(**hyperparams), losses
 
 if __name__ == "__main__":
 	with open(os.path.join(ROOT_DIR, "data", 'test_data.json'), 'r', encoding='utf8') as _f:
