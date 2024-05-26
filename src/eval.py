@@ -4,6 +4,7 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 from preprocessing import *
 import negex, crf, lstm
 from time import time
+import random
 import fasttext
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
@@ -247,6 +248,30 @@ class EnhancedEvalModel(EvalModel):
 			if i == len(keys):
 				break
 		print(f"Progress: {total}/{total}")
+		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
+	
+	def random_search(
+			self,
+			params_ranges: dict,
+			n_iter: int
+	) -> List[dict]:
+		"""
+		Perform random search over the hyperparameters.
+		"""
+		combinations = []
+		
+		for p in range(n_iter):
+			print(f"Progress: {p}/{n_iter}", end="\r")
+			
+			# Randomly sample a combination of hyperparameters
+			while True:
+				params = {key: random.choice(values) for key, values in params_ranges.items()}
+				if params not in [c["params"] for c in combinations]:
+					break
+			metrics = self.evaluate(**params)
+			combinations.append({"params": params, "metrics": metrics})
+		
+		print(f"Progress: {n_iter}/{n_iter}")
 		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
 	
 	def cross_validation(
