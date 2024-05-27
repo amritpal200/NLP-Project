@@ -2,8 +2,11 @@ import json
 import os
 from sklearn.metrics import precision_score, recall_score, f1_score
 from preprocessing import *
-import negex, crf
+import negex, crf, lstm
 from time import time
+import random
+import fasttext
+import torch
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
 
@@ -165,24 +168,7 @@ class EvalModel(EvalOfficial):
 			)
 		return metrics
 
-class EvalNegex(EvalModel):
-	def __init__(
-			self,
-			save_dir: str,
-			results_dir: str,
-			data_path: str,
-			load_existing_tokens: bool = False,
-			**kwargs
-	):
-		super(EvalNegex, self).__init__(save_dir, results_dir, data_path, load_existing_tokens, **kwargs)
-		self.name = "Negex"
-
-	def predict(self, **kwargs) -> None:
-		tokens = self.load_tokens()
-		predictions = negex.process_data(tokens, max_context_size=kwargs.get("max_context_size", 5))
-		negex.write_predictions(self.data, predictions, "data_predictions.json", dir=self.save_dir.split("/")[-1])
-
-class EvalCRF(EvalModel):
+class EnhancedEvalModel(EvalModel):
 	def __init__(
 			self,
 			save_dir: str,
@@ -195,7 +181,7 @@ class EvalCRF(EvalModel):
 			load_existing_eval_pos: bool = False,
 			**kwargs
 	):
-		super(EvalCRF, self).__init__(save_dir, results_dir, eval_data_path, load_existing_eval_tokens, **kwargs)
+		super(EnhancedEvalModel, self).__init__(save_dir, results_dir, eval_data_path, load_existing_eval_tokens, **kwargs)
 		self.train_data_path = train_data_path
 		self.eval_data_path = eval_data_path
 		self.train_data = self.load_data(self.train_data_path)
@@ -227,41 +213,10 @@ class EvalCRF(EvalModel):
 			)
 		if self.verbose: print("Loading NLP models...")
 		self.nlps = load_nlps()
-		self.name = "CRF"
+		self.name = "Enhanced"
 		self.model = None
 		self.kwargs = kwargs
 
-	def predict(self, **kwargs) -> None:
-		self.model.process(
-			data_path=self.data_path,
-			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
-			save_path=os.path.join(self.save_dir, "data_predictions.json"),
-			pos_path=os.path.join(self.save_dir, "data_pos.json"),		
-		)
-
-	def evaluate(self, **kwargs) -> dict:
-		if self.verbose: print("Instantiating CRF...")
-		# delete previous model
-		if os.path.exists(os.path.join(self.save_dir, "crf_0_0.crfsuite")):
-			os.remove(os.path.join(self.save_dir, "crf_0_0.crfsuite"))
-		self.model = crf.CRF(
-			model_path=os.path.join(self.save_dir, "crf_0_0.crfsuite"), # TODO: allow multiple models
-			trainer_params={k: v for k, v in kwargs.items() if k != "save_results"},
-			nlps=self.nlps,
-			verbose=self.verbose
-		)
-		if self.verbose: print("Training CRF...")
-		self.model.train(
-			train_tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
-			train_labels_path=os.path.join(self.save_dir, "train_data_bio.json"),
-			train_pos_path=os.path.join(self.save_dir, "train_data_pos.json")
-		)
-		hyperparams = kwargs
-		hyperparams["lemmatize"] = self.kwargs.get("lemmatize", False)
-		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
-		hyperparams["replace_numbers"] = self.kwargs.get("replace_numbers", None)
-		return super(EvalCRF, self).evaluate(**hyperparams)
-	
 	def grid_search(
 			self,
 			params_ranges: dict
@@ -295,26 +250,57 @@ class EvalCRF(EvalModel):
 				break
 		print(f"Progress: {total}/{total}")
 		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
-
+	
+	def random_search(
+			self,
+			params_ranges: dict,
+			n_iter: int
+	) -> List[dict]:
+		"""
+		Perform random search over the hyperparameters.
+		"""
+		combinations = []
+		
+		for p in range(n_iter):
+			print(f"Progress: {p}/{n_iter}", end="\r")
+			
+			# Randomly sample a combination of hyperparameters
+			while True:
+				params = {key: random.choice(values) for key, values in params_ranges.items()}
+				if params not in [c["params"] for c in combinations]:
+					break
+			metrics = self.evaluate(**params)
+			if isinstance(metrics, tuple):
+				metrics, _ = metrics
+			combinations.append({"params": params, "metrics": metrics})
+		
+		print(f"Progress: {n_iter}/{n_iter}")
+		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
+	
 	def cross_validation(
 			self,
 			n_splits: int,
+			file_names: List[str] = [
+				"train_data_tokens.json",
+				"train_data_bio.json",
+				"train_data_pos.json",
+				"data_tokens.json",
+				"data_pos.json"
+			],
 			**kwargs
 	) -> dict:
+		"""
+		Perform cross-validation over the data.
+		"""
 		# save original data
 		original_train_data_path = self.train_data_path
 		original_eval_data_path = self.eval_data_path
 		original_train_data = self.train_data.copy()
-		with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'r', encoding='utf8') as _f:
-			original_train_data_tokens = json.load(_f)
-		with open(os.path.join(self.save_dir, "train_data_bio.json"), 'r', encoding='utf8') as _f:
-			original_train_data_bio = json.load(_f)
-		with open(os.path.join(self.save_dir, "train_data_pos.json"), 'r', encoding='utf8') as _f:
-			original_train_data_pos = json.load(_f)
-		with open(os.path.join(self.save_dir, "data_tokens.json"), 'r', encoding='utf8') as _f:
-			original_eval_data_tokens = json.load(_f)
-		with open(os.path.join(self.save_dir, "data_pos.json"), 'r', encoding='utf8') as _f:
-			original_eval_data_pos = json.load(_f)
+		original_data = []
+		file_names.extend(kwargs.get("extra_files", []))
+		for file_name in file_names:
+			with open(os.path.join(self.save_dir, file_name), 'r', encoding='utf8') as _f:
+				original_data.append(json.load(_f))
 
 		# split, save and evaluate
 		total_docs = len(self.train_data)
@@ -325,20 +311,19 @@ class EvalCRF(EvalModel):
 			self.train_data_path = os.path.join(self.save_dir, "train_data.json")
 			self.eval_data_path = os.path.join(self.save_dir, "data.json")
 			self.data_path = self.eval_data_path
+
 			with open(self.train_data_path, 'w', encoding='utf8') as _f:
 				json.dump(original_train_data[:split_idxs[i]] + original_train_data[split_idxs[i+1]:], _f)
 			with open(self.data_path, 'w', encoding='utf8') as _f:
 				json.dump(original_train_data[split_idxs[i]:split_idxs[i+1]], _f)
-			with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'w', encoding='utf8') as _f:
-				json.dump(original_train_data_tokens[:split_idxs[i]] + original_train_data_tokens[split_idxs[i+1]:], _f)
-			with open(os.path.join(self.save_dir, "train_data_bio.json"), 'w', encoding='utf8') as _f:
-				json.dump(original_train_data_bio[:split_idxs[i]] + original_train_data_bio[split_idxs[i+1]:], _f)
-			with open(os.path.join(self.save_dir, "train_data_pos.json"), 'w', encoding='utf8') as _f:
-				json.dump(original_train_data_pos[:split_idxs[i]] + original_train_data_pos[split_idxs[i+1]:], _f)
-			with open(os.path.join(self.save_dir, "data_tokens.json"), 'w', encoding='utf8') as _f:
-				json.dump(original_train_data_tokens[split_idxs[i]:split_idxs[i+1]], _f)
-			with open(os.path.join(self.save_dir, "data_pos.json"), 'w', encoding='utf8') as _f:
-				json.dump(original_train_data_pos[split_idxs[i]:split_idxs[i+1]], _f)
+				
+			for file_name, data in zip(file_names, original_data):
+				with open(os.path.join(self.save_dir, file_name), 'w', encoding='utf8') as _f:
+					if file_name.startswith("train"):
+						json.dump(data[:split_idxs[i]] + data[split_idxs[i+1]:], _f)
+					else:
+						json.dump(data[split_idxs[i]:split_idxs[i+1]], _f)
+
 			results.append(self.evaluate(**kwargs, save_results=False))
 		
 		# return data to original state
@@ -347,16 +332,10 @@ class EvalCRF(EvalModel):
 		self.train_data_path = original_train_data_path
 		self.eval_data_path = original_eval_data_path
 		self.data_path = self.eval_data_path
-		with open(os.path.join(self.save_dir, "train_data_tokens.json"), 'w', encoding='utf8') as _f:
-			json.dump(original_train_data_tokens, _f)
-		with open(os.path.join(self.save_dir, "train_data_bio.json"), 'w', encoding='utf8') as _f:
-			json.dump(original_train_data_bio, _f)
-		with open(os.path.join(self.save_dir, "train_data_pos.json"), 'w', encoding='utf8') as _f:
-			json.dump(original_train_data_pos, _f)
-		with open(os.path.join(self.save_dir, "data_tokens.json"), 'w', encoding='utf8') as _f:
-			json.dump(original_eval_data_tokens, _f)
-		with open(os.path.join(self.save_dir, "data_pos.json"), 'w', encoding='utf8') as _f:
-			json.dump(original_eval_data_pos, _f)		
+
+		for file_name, data in zip(file_names, original_data):
+			with open(os.path.join(self.save_dir, file_name), 'w', encoding='utf8') as _f:
+				json.dump(data, _f)
 
 		cv_results = {
 			"results": results,
@@ -376,6 +355,162 @@ class EvalCRF(EvalModel):
 		)
 		return cv_results
 
+class EvalNegex(EvalModel):
+	def __init__(
+			self,
+			save_dir: str,
+			results_dir: str,
+			data_path: str,
+			load_existing_tokens: bool = False,
+			**kwargs
+	):
+		super(EvalNegex, self).__init__(save_dir, results_dir, data_path, load_existing_tokens, **kwargs)
+		self.name = "Negex"
+
+	def predict(self, **kwargs) -> None:
+		tokens = self.load_tokens()
+		predictions = negex.process_data(tokens, max_context_size=kwargs.get("max_context_size", 5))
+		negex.write_predictions(self.data, predictions, "data_predictions.json", dir=self.save_dir.split("/")[-1])
+
+class EvalCRF(EnhancedEvalModel):
+	def __init__(
+			self,
+			save_dir: str,
+			results_dir: str,
+			train_data_path: str,
+			eval_data_path: str,
+			load_existing_train_tokens: bool = False,
+			load_existing_eval_tokens: bool = False,
+			load_existing_train_pos: bool = False,
+			load_existing_eval_pos: bool = False,
+			**kwargs
+	):
+		super(EvalCRF, self).__init__(save_dir, results_dir, train_data_path, eval_data_path, load_existing_train_tokens,\
+								load_existing_eval_tokens, load_existing_train_pos, load_existing_eval_pos, **kwargs)
+		self.name = "CRF"
+
+	def predict(self, **kwargs) -> None:
+		self.model.process(
+			data_path=self.data_path,
+			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
+			save_path=os.path.join(self.save_dir, "data_predictions.json"),
+			pos_path=os.path.join(self.save_dir, "data_pos.json"),		
+		)
+
+	def evaluate(self, **kwargs) -> dict:
+		if self.verbose: print("Instantiating CRF...")
+		# delete previous model
+		if os.path.exists(os.path.join(self.save_dir, "crf_0_0.crfsuite")):
+			os.remove(os.path.join(self.save_dir, "crf_0_0.crfsuite"))
+		self.model = crf.CRF(
+			model_path=os.path.join(self.save_dir, "crf_0_0.crfsuite"), # TODO: allow multiple models
+			trainer_params={k: v for k, v in kwargs.items() if k != "save_results"},
+			nlps=self.nlps,
+			verbose=self.verbose
+		)
+		if self.verbose: print("Training CRF...")
+		self.model.train(
+			train_tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
+			train_labels_path=os.path.join(self.save_dir, "train_data_bio.json"),
+			train_pos_path=os.path.join(self.save_dir, "train_data_pos.json")
+		)
+		hyperparams = kwargs
+		hyperparams["lemmatize"] = self.kwargs.get("lemmatize", False)
+		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
+		hyperparams["replace_numbers"] = self.kwargs.get("replace_numbers", None)
+		return super(EvalCRF, self).evaluate(**hyperparams)
+
+class EvalLSTM(EnhancedEvalModel):
+	def __init__(
+			self,
+			save_dir: str,
+			results_dir: str,
+			train_data_path: str,
+			eval_data_path: str,
+			device: torch.device,
+			fasttext_model: Optional[fasttext.FastText._FastText] = None,
+			load_existing_train_tokens: bool = False,
+			load_existing_eval_tokens: bool = False,
+			load_existing_train_pos: bool = False,
+			load_existing_eval_pos: bool = False,
+			load_existing_train_lemmas: bool = False,
+			load_existing_eval_lemmas: bool = False,
+			**kwargs
+	):
+		super(EvalLSTM, self).__init__(save_dir, results_dir, train_data_path, eval_data_path, load_existing_train_tokens,\
+								load_existing_eval_tokens, load_existing_train_pos, load_existing_eval_pos, **kwargs)
+		if not load_existing_train_lemmas:
+			if self.verbose: print("Precomputing training lemmas...")
+			lstm.precompute_lemmas(
+				tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
+				lemmas_path=os.path.join(self.save_dir, "train_data_lemmas.json"),
+				verbose=self.verbose
+			)
+		if not load_existing_eval_lemmas:
+			if self.verbose: print("Precomputing evaluation lemmas...")
+			lstm.precompute_lemmas(
+				tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
+				lemmas_path=os.path.join(self.save_dir, "data_lemmas.json"),
+				verbose=self.verbose
+			)
+		if fasttext_model is None:
+			if self.verbose: print("Loading FastText model...")
+			self.ft = lstm.load_fasttext()
+		else:
+			self.ft = fasttext_model
+
+		self.device = device
+		self.name = "LSTM"
+
+	def predict(self, **kwargs) -> None:
+		self.model.process(
+			data_path=self.data_path,
+			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
+			lemmas_path=os.path.join(self.save_dir, "data_lemmas.json"),
+			save_path=os.path.join(self.save_dir, "data_predictions.json"),
+			pos_path=os.path.join(self.save_dir, "data_pos.json")
+		)
+
+	def evaluate(self, **kwargs) -> Tuple[dict, List[float]]:
+		if self.verbose: print("Instantiating LSTM...")
+		# delete previous model
+		if os.path.exists(os.path.join(self.save_dir, "lstm_0_0.pt")):
+			os.remove(os.path.join(self.save_dir, "lstm_0_0.pt"))
+		self.model = lstm.LSTM(
+			model_path=os.path.join(self.save_dir, "lstm_0_0.pt"),
+			device=self.device,
+			hyperparams={k: v for k, v in kwargs.items() if k != "save_results"},
+			ft=self.ft,
+			verbose=self.verbose
+		)
+		if self.verbose: print("Training LSTM...")
+		losses = self.model.train(
+			train_tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
+			train_lemmas_path=os.path.join(self.save_dir, "train_data_lemmas.json"),
+			train_labels_path=os.path.join(self.save_dir, "train_data_bio.json"),
+			train_pos_path=os.path.join(self.save_dir, "train_data_pos.json")
+		)
+		hyperparams = kwargs
+		hyperparams["lemmatize"] = self.kwargs.get("lemmatize", False)
+		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
+		hyperparams["replace_numbers"] = self.kwargs.get("replace_numbers", None)
+		return super(EvalLSTM, self).evaluate(**hyperparams), losses
+	
+	def cross_validation(
+			self,
+			n_splits: int,
+			file_names: List[str] = [
+				"train_data_tokens.json",
+				"train_data_bio.json",
+				"train_data_pos.json",
+				"train_data_lemmas.json",
+				"data_tokens.json",
+				"data_pos.json",
+				"data_lemmas.json"
+			],
+			**kwargs
+	) -> dict:
+		super(EvalLSTM, self).cross_validation(n_splits, file_names, **kwargs)
 
 if __name__ == "__main__":
 	with open(os.path.join(ROOT_DIR, "data", 'test_data.json'), 'r', encoding='utf8') as _f:

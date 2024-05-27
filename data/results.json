@@ -693,5 +693,293 @@
                 "replace_numbers": null
             }
         }
+    ],
+    "LSTM": [
+        {
+            "metrics": {
+                "precision": 0.9602037195348162,
+                "recall": 0.9602037195348162,
+                "f1": 0.9602037195348162,
+                "time": 8.9967
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 300,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 10,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9510258560898108,
+                "recall": 0.9510258560898108,
+                "f1": 0.9510258560898108,
+                "time": 8.8109
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 448,
+                "num_layers": 1,
+                "output_dim": 9,
+                "seq_len": 5,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.946416762101392,
+                "recall": 0.946416762101392,
+                "f1": 0.946416762101392,
+                "time": 16.1916
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 448,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 20,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.960937626014162,
+                "recall": 0.960937626014162,
+                "f1": 0.960937626014162,
+                "time": 13.8608
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 448,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 15,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9486547736180783,
+                "recall": 0.9486547736180783,
+                "f1": 0.9486547736180783,
+                "time": 11.7835
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 448,
+                "num_layers": 1,
+                "output_dim": 9,
+                "seq_len": 20,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9588609126248044,
+                "recall": 0.9588609126248044,
+                "f1": 0.9588609126248044,
+                "time": 12.1476
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 512,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 10,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.955699469329161,
+                "recall": 0.955699469329161,
+                "f1": 0.955699469329161,
+                "time": 7.837
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 256,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 10,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9517234704905077,
+                "recall": 0.9517234704905077,
+                "f1": 0.9517234704905077,
+                "time": 6.0406
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 320,
+                "num_layers": 1,
+                "output_dim": 9,
+                "seq_len": 5,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9551550881494266,
+                "recall": 0.9551550881494266,
+                "f1": 0.9551550881494266,
+                "time": 21.5301
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 512,
+                "num_layers": 3,
+                "output_dim": 9,
+                "seq_len": 15,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9536025936738874,
+                "recall": 0.9536025936738874,
+                "f1": 0.9536025936738874,
+                "time": 11.5383
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 512,
+                "num_layers": 3,
+                "output_dim": 9,
+                "seq_len": 5,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.959627078729616,
+                "recall": 0.959627078729616,
+                "f1": 0.959627078729616,
+                "time": 8.9014
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 256,
+                "num_layers": 1,
+                "output_dim": 9,
+                "seq_len": 15,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": true,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9706518057325354,
+                "recall": 0.9706518057325354,
+                "f1": 0.9706518057325354,
+                "time": 26.4395
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 448,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 15,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": false,
+                "replace_numbers": null
+            }
+        },
+        {
+            "metrics": {
+                "precision": 0.9773902848690464,
+                "recall": 0.9773902848690464,
+                "f1": 0.9773902848690464,
+                "time": 22.0918
+            },
+            "hyperparameters": {
+                "input_dim": 617,
+                "hidden_dim": 448,
+                "num_layers": 2,
+                "output_dim": 9,
+                "seq_len": 15,
+                "epochs": 1,
+                "batch_size": 32,
+                "learning_rate": 0.001,
+                "num_workers": 12,
+                "lemmatize": false,
+                "remove_punctuation": false,
+                "replace_numbers": "<NUM>"
+            }
+        }
     ]
 }
