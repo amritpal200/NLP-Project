@@ -292,12 +292,12 @@ class EnhancedEvalModel(EvalModel):
 		"""
 		Perform cross-validation over the data.
 		"""
-		# save original dataoriginal_train_data_path
+		# save original data
 		original_train_data_path = self.train_data_path
 		original_eval_data_path = self.eval_data_path
 		original_train_data = self.train_data.copy()
 		original_data = []
-		file_names = file_names.extend(kwargs.get("extra_files", [])).extend(kwargs.get("extra_files", []))
+		file_names.extend(kwargs.get("extra_files", []))
 		for file_name in file_names:
 			with open(os.path.join(self.save_dir, file_name), 'r', encoding='utf8') as _f:
 				original_data.append(json.load(_f))
@@ -495,6 +495,22 @@ class EvalLSTM(EnhancedEvalModel):
 		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
 		hyperparams["replace_numbers"] = self.kwargs.get("replace_numbers", None)
 		return super(EvalLSTM, self).evaluate(**hyperparams), losses
+	
+	def cross_validation(
+			self,
+			n_splits: int,
+			file_names: List[str] = [
+				"train_data_tokens.json",
+				"train_data_bio.json",
+				"train_data_pos.json",
+				"train_data_lemmas.json",
+				"data_tokens.json",
+				"data_pos.json",
+				"data_lemmas.json"
+			],
+			**kwargs
+	) -> dict:
+		super(EvalLSTM, self).cross_validation(n_splits, file_names, **kwargs)
 
 if __name__ == "__main__":
 	with open(os.path.join(ROOT_DIR, "data", 'test_data.json'), 'r', encoding='utf8') as _f:
