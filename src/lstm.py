@@ -97,31 +97,36 @@ class SlidingWindowDataset(Dataset):
 class OverlappingWindowDataset(SlidingWindowDataset):
 	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
 		super().__init__(data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len, padding_value)
+		self.anterior_size = max(1, self.seq_len * 80 // 100)
+		self.posterior_size = max(1, self.seq_len - self.anterior_size)
 
 	def __len__(self):
 		return len(self.data_tokens)
 	
 	def __getitem__(self, idx):
 		# get sequence around the idx
-		start = max(0, idx - self.seq_len//2)
-		end = min(len(self.data_tokens), idx + self.seq_len//2)
+		start = max(0, idx - self.anterior_size)
+		end = min(len(self.data_tokens), idx + self.posterior_size)
 		return self.getseq(idx, start, end)
 
 class NegationDetectionModel(nn.Module):
 	def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
 		super(NegationDetectionModel, self).__init__()
 		
+		# Dense layer
+		self.fc1 = nn.Linear(input_dim, hidden_dim)
 		# BiLSTM Layer
-		self.bilstm = nn.LSTM(input_dim, hidden_dim, num_layers, bidirectional=True, batch_first=True)
+		self.bilstm = nn.LSTM(hidden_dim, hidden_dim, num_layers, bidirectional=True, batch_first=True)
 		# Dense Layer
-		self.fc = nn.Linear(hidden_dim * 2, output_dim) # 2 for concatenating both directions
+		self.fc2 = nn.Linear(hidden_dim * 2, output_dim) # 2 for concatenating both directions
 		
 	def forward(self, word_embeds):
-		bilstm_out, _ = self.bilstm(word_embeds)
+		fc_out = self.fc1(word_embeds)
+		bilstm_out, _ = self.bilstm(fc_out)
 		forward_last = bilstm_out[:, -1, :300]
 		backward_last = bilstm_out[:, 0, 300:]
 		concat = torch.cat((forward_last, backward_last), dim=1)
-		out = self.fc(concat)
+		out = self.fc2(concat)
 		return out
 
 class LSTM:
