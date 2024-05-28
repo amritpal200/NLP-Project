@@ -5,7 +5,12 @@ import nltk
 import string
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
-def put_bio(data, data_tokens, train_data_bio):
+
+def put_bio(
+		data: List[Dict[str, Any]],
+		data_tokens: List[List[Dict[str, Any]]],
+		train_data_bio: List[List[List[str]]]
+):
 	tags = {"NEG": ["B-NEG", "I-NEG"], "NSCO": ["B-NSCO", "I-NSCO"],\
 		 	"UNC": ["B-UNC", "I-UNC"], "USCO": ["B-USCO", "I-USCO"]}
 
@@ -30,7 +35,13 @@ def put_bio(data, data_tokens, train_data_bio):
 							break
 					break # we found the sentence
 
-def create_bio_tags(data, data_tokens):
+def create_bio_tags(
+		data: List[Dict[str, Any]],
+		data_tokens: List[List[Dict[str, Any]]]
+) -> List[List[List[str]]]:
+	"""
+	Creates BIO tags for the given data.
+	"""
 	data_bio = [[["O"]*len(sent["tokens"]) for sent in doc] for doc in data_tokens]
 	put_bio(data, data_tokens, data_bio)
 	return data_bio
@@ -75,9 +86,11 @@ class CRF:
 		if nlps is None:
 			nlps = load_nlps()
 		self.nlp_es, self.nlp_ca = nlps
+		# Disable NER and parser for faster processing
 		self.nlp_es.disable_pipes('ner', 'parser')
 		self.nlp_ca.disable_pipes('ner', 'parser')
 
+		# Set trainer parameters
 		other_params = ["padding", "before_lim", "after_lim", "special_words"]
 		self.padding = trainer_params.get("padding", False)
 		self.before_lim = trainer_params.get("before_lim", 6)
@@ -87,6 +100,7 @@ class CRF:
 		trainer_params = {k:v for k,v in trainer_params.items() if k not in other_params}
 		self.verbose = verbose
 
+		# Load model if it exists, otherwise create a new one
 		if os.path.exists(model_path):
 			self.tagger = crfs.Tagger()
 			self.tagger.open(model_path)
@@ -222,6 +236,7 @@ class CRF:
 		if self.trainer is None:
 			raise ValueError("Model already trained")
 		
+		# Load raw training data
 		train_data = load_tokens(train_tokens_path)
 		with open(train_labels_path, "r") as f:
 			train_labels = json.load(f)
@@ -229,6 +244,7 @@ class CRF:
 			with open(train_pos_path, "r") as f:
 				train_pos = json.load(f)
 
+		# Process input data into words, POS tags, and labels
 		sents = []
 		for d, (doc_tokens, doc_labels) in tqdm(enumerate(zip(train_data, train_labels)),\
 										  total=len(train_data), disable=not self.verbose):
@@ -246,6 +262,7 @@ class CRF:
 				sent.extend(list(zip(sentence["tokens"], pos, labels)))
 			sents.append(sent)
 
+		# Create input features and target labels
 		X_train = [self.sent2features(sent) for sent in sents]
 		y_train = [self.sent2labels(sent) for sent in sents]
 
@@ -273,7 +290,7 @@ class CRF:
 		if self.tagger is None:
 			raise ValueError("Model not trained")
 
-		# convert tokens to List[Tuple[str, str]]
+		# POS tagging if not provided
 		if pos is None:
 			if lang == "ca":
 				doc = self.nlp_ca(" ".join(tokens))
@@ -281,6 +298,7 @@ class CRF:
 				doc = self.nlp_es(" ".join(tokens))
 			pos = [token.pos_ for token in doc]
 		sent = [(token, p, "") for token,p in zip(tokens, pos)]
+		# Get features and predict labels
 		x = self.sent2features(sent)
 		y = self.tagger.tag(x)
 

@@ -25,11 +25,20 @@ def precompute_lemmas(
 	with open(lemmas_path, "w") as f:
 		json.dump(lemmas, f)
 
-def load_fasttext():
+def load_fasttext() -> fasttext.FastText._FastText:
 	fasttext.util.download_model("es", if_exists="ignore")
 	return fasttext.load_model("cc.es.300.bin")
 
-def load_data(tokens_path, lemmas_path, pos_path, labels_path, frac=1.0):
+def load_data(
+		tokens_path: str,
+		lemmas_path: str,
+		pos_path: str,
+		labels_path: str,
+		frac: float=1.0
+) -> Tuple[list, list, list, list]:
+	"""
+	Loads the data from the given paths.
+	"""
 	tokens = load_tokens(tokens_path)
 	n = int(len(tokens) * frac)
 	tokens = tokens[:n]
@@ -42,7 +51,20 @@ def load_data(tokens_path, lemmas_path, pos_path, labels_path, frac=1.0):
 	return tokens, lemmas, pos, labels
 
 class SlidingWindowDataset(Dataset):
-	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
+	def __init__(
+			self,
+			data_tokens: list,
+			data_lemmas: list,
+			data_pos: list,
+			data_labels: list,
+			ft: fasttext.FastText._FastText,
+			seq_len: int=10,
+			padding_value: int=0
+	):
+		"""
+		Dataset that returns sequences by sliding a window over the data (no sentence frontiers).
+		"""
+		# Flatten data
 		self.data_tokens = [sent["tokens"] for doc in data_tokens for sent in doc]
 		self.data_tokens = np.concatenate(self.data_tokens)
 		self.data_lemmas = [sent for doc in data_lemmas for sent in doc]
@@ -56,24 +78,41 @@ class SlidingWindowDataset(Dataset):
 		self.seq_len = seq_len
 		self.padding_value = padding_value
 
+		self.label2idx = {"B-NEG": 0, "I-NEG": 1, "B-NSCO": 2, "I-NSCO": 3,\
+		  		"B-UNC": 4, "I-UNC": 5, "B-USCO": 6, "I-USCO": 7, "O": 8}
+
+		# Prepare one-hot encoder for POS
 		self.pos2idx = {"ADJ": 0, "ADP": 1, "ADV": 2, "AUX": 3, "CCONJ": 4, "DET": 5, "INTJ": 6, "NOUN": 7,\
 						"NUM": 8, "PART": 9, "PRON": 10, "PROPN": 11, "PUNCT": 12, "SCONJ": 13, "SYM": 14,\
 						"VERB": 15, "X": 16}
-		self.label2idx = {"B-NEG": 0, "I-NEG": 1, "B-NSCO": 2, "I-NSCO": 3,\
-		  		"B-UNC": 4, "I-UNC": 5, "B-USCO": 6, "I-USCO": 7, "O": 8}
-		
 		self.pos_encoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
 		self.pos_encoder.fit(np.array(list(self.pos2idx.values())).reshape(-1, 1))
 
-	def pad(self, tokens, lemmas, pos):
-		# Pad if shorter than seq_len
+	def pad(
+			self,
+			tokens: np.ndarray,
+			lemmas: np.ndarray,
+			pos: np.ndarray
+	) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+		"""
+		Pads the sequences to the desired length.
+		"""
 		if len(tokens) < self.seq_len:
 			tokens = np.pad(tokens, (0, self.seq_len - len(tokens)), "constant", constant_values=self.padding_value)
 			lemmas = np.pad(lemmas, (0, self.seq_len - len(lemmas)), "constant", constant_values=self.padding_value)
 			pos = np.pad(pos, (0, self.seq_len - len(pos)), "constant", constant_values=self.padding_value)
 		return tokens, lemmas, pos
 
-	def get_vectors(self, tokens, lemmas, pos, label):
+	def get_vectors(
+			self,
+			tokens: np.ndarray,
+			lemmas: np.ndarray,
+			pos: np.ndarray,
+			label: str
+	) -> Tuple[np.ndarray, int]:
+		"""
+		Returns the input and output vectors for a sequence.
+		"""
 		token_embeddings = np.array([self.ft.get_word_vector(token) for token in tokens])
 		lemma_embeddings = np.array([self.ft.get_word_vector(lemma) for lemma in lemmas])
 		pos_indices = np.array([self.pos2idx.get(p, 16) for p in pos]).reshape(-1, 1)
@@ -84,7 +123,16 @@ class SlidingWindowDataset(Dataset):
 		y = label_idx
 		return x, y
 	
-	def getseq(self, idx, start, end):
+	def getseq(
+			self,
+			idx: int,
+			start: int,
+			end: int
+	) -> Tuple[torch.Tensor, torch.Tensor]:
+		"""
+		A more generic __getitem__.
+			Returns the input and output vectors for a sequence.
+		"""
 		tokens = self.data_tokens[start:end]
 		lemmas = self.data_lemmas[start:end]
 		pos = self.data_pos[start:end]
@@ -95,22 +143,39 @@ class SlidingWindowDataset(Dataset):
 		return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
 
 class OverlappingWindowDataset(SlidingWindowDataset):
-	def __init__(self, data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len=10, padding_value=0):
+	def __init__(
+			self,
+			data_tokens: list,
+			data_lemmas: list,
+			data_pos: list,
+			data_labels: list,
+			ft: fasttext.FastText._FastText,
+			seq_len: int=10,
+			padding_value: int=0):
+		"""
+		Dataset that returns overlapping sequences by sliding a window over the data (no sentence frontiers).
+		"""
 		super().__init__(data_tokens, data_lemmas, data_pos, data_labels, ft, seq_len, padding_value)
-		self.anterior_size = max(1, self.seq_len * 80 // 100)
-		self.posterior_size = max(1, self.seq_len - self.anterior_size)
+		self.anterior_size = max(1, self.seq_len * 80 // 100) # 80% of the sequence for the anterior context
+		self.posterior_size = max(1, self.seq_len - self.anterior_size) # 20% of the sequence for the posterior context
 
 	def __len__(self):
 		return len(self.data_tokens)
 	
-	def __getitem__(self, idx):
+	def __getitem__(self, idx: int):
 		# get sequence around the idx
 		start = max(0, idx - self.anterior_size)
 		end = min(len(self.data_tokens), idx + self.posterior_size)
 		return self.getseq(idx, start, end)
 
 class NegationDetectionModel(nn.Module):
-	def __init__(self, input_dim, hidden_dim, num_layers, output_dim):
+	def __init__(
+			self,
+			input_dim: int,
+			hidden_dim: int,
+			num_layers: int,
+			output_dim: int
+	):
 		super(NegationDetectionModel, self).__init__()
 		
 		# Dense layer
@@ -120,9 +185,10 @@ class NegationDetectionModel(nn.Module):
 		# Dense Layer
 		self.fc2 = nn.Linear(hidden_dim * 2, output_dim) # 2 for concatenating both directions
 		
-	def forward(self, word_embeds):
+	def forward(self, word_embeds: torch.Tensor) -> torch.Tensor:
 		fc_out = self.fc1(word_embeds)
 		bilstm_out, _ = self.bilstm(fc_out)
+		# Concat the final output of the forward and backward LSTM
 		forward_last = bilstm_out[:, -1, :300]
 		backward_last = bilstm_out[:, 0, 300:]
 		concat = torch.cat((forward_last, backward_last), dim=1)
@@ -147,7 +213,8 @@ class LSTM:
 		if ft is None:
 			if self.verbose: print("Loading FastText...")
 			self.ft = load_fasttext()
-
+		
+		# Create model or load if provided
 		pretrained = os.path.exists(model_path)
 		if pretrained:
 			checkpoint = torch.load(model_path)
@@ -163,6 +230,7 @@ class LSTM:
 		if pretrained:
 			self.model.load_state_dict(checkpoint["model_state_dict"])
 
+		# Set hyperparameters
 		self.seq_len = self.hyperparams.get("seq_len", 10)
 		self.padding_value = self.hyperparams.get("padding_value", 0)
 		self.epochs = self.hyperparams.get("epochs", 10)
@@ -178,12 +246,17 @@ class LSTM:
 			train_labels_path: str,
 			**kwargs
 	) -> List[float]:
+		"""
+		Trains the model with the given data.
+		"""
+		# Override hyperparameters if provided
 		epochs = kwargs.get("epochs", self.epochs)
 		batch_size = kwargs.get("batch_size", self.batch_size)
 		lr = kwargs.get("lr", self.lr)
 		num_workers = kwargs.get("num_workers", self.num_workers)
 		frac = kwargs.get("frac", 1.0)
 
+		# Prepare training set
 		if self.verbose: print("Preparing training set...")
 		train_data = load_data(train_tokens_path, train_lemmas_path, train_pos_path, train_labels_path, frac=frac)
 		train_dataset = OverlappingWindowDataset(*train_data, self.ft, self.seq_len, self.padding_value)
@@ -193,6 +266,7 @@ class LSTM:
 		optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 		self.model.train()
 		
+		# Train model
 		if self.verbose: print("Training model...")
 		losses = []
 		for epoch in range(epochs):
@@ -218,6 +292,9 @@ class LSTM:
 		return losses
 	
 	def forward(self, x: torch.Tensor) -> torch.Tensor:
+		"""
+		Forward pass without updating weights.
+		"""
 		self.model.eval()
 		with torch.no_grad():
 			x = x.to(self.device)
@@ -230,6 +307,9 @@ class LSTM:
 			lemmas: List[str],
 			pos: List[str]
 	) -> List[str]:
+		"""
+		Predicts the labels for the given sentence. Just for testing purposes, not efficient to scale.
+		"""
 		labels = ["O"] * len(tokens)
 		tokens = {"tokens": tokens}
 		temp_dataset = OverlappingWindowDataset([[tokens]], [[lemmas]], [[pos]], [[labels]], self.ft, self.seq_len, self.padding_value)
@@ -254,10 +334,15 @@ class LSTM:
 			test_labels_path: str,
 			**kwargs
 	) -> Tuple[float, float]:
+		"""
+		Evaluates the model with the given data.
+		"""
+		# Override hyperparameters if provided
 		batch_size = kwargs.get("batch_size", self.batch_size)
 		num_workers = kwargs.get("num_workers", self.num_workers)
 		frac = kwargs.get("frac", 1.0)
 
+		# Prepare test set
 		if self.verbose: print("Preparing test set...")
 		test_data = load_data(test_tokens_path, test_lemmas_path, test_pos_path, test_labels_path, frac=frac)
 		test_dataset = OverlappingWindowDataset(*test_data, self.ft, self.seq_len, self.padding_value)
@@ -270,6 +355,7 @@ class LSTM:
 		correct = 0
 		total = 0
 		
+		# Evaluate model
 		with torch.no_grad():
 			for sequences, targets in tqdm(test_dataloader, disable=not self.verbose):
 				# Forward pass
@@ -302,6 +388,10 @@ class LSTM:
 			pos_path: str,
 			save_path: str,
 	) -> None:
+		"""
+		Processes the data and saves the predictions to a file.
+		"""
+		# Load data
 		with open(data_path, "r") as f:
 			data = json.load(f)
 		data_tokens = load_tokens(tokens_path)
@@ -313,7 +403,8 @@ class LSTM:
 		if not os.path.exists(save_dir):
 			os.makedirs(save_dir)
 
-		data_labels = [[["O"] * len(sent["tokens"]) for sent in doc] for doc in data_tokens]
+		# Prepare temporary dataset for predictions
+		data_labels = [[["O"] * len(sent["tokens"]) for sent in doc] for doc in data_tokens] # dummy labels, won't be used anyway
 		dataset = OverlappingWindowDataset(data_tokens, data_lemmas, data_pos, data_labels, self.ft, self.seq_len, self.padding_value)
 		dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 		idx2label = {v: k for k, v in dataset.label2idx.items()}
@@ -322,6 +413,7 @@ class LSTM:
 		predictions = []
 
 		with torch.no_grad():
+			# Predict labels for sequences in batches
 			for sequences, _ in tqdm(dataloader, disable=not self.verbose):
 				outputs = self.forward(sequences)
 				_, predicted = torch.max(outputs, 1)
@@ -330,7 +422,7 @@ class LSTM:
 					predicted = [predicted]
 				predictions.extend([idx2label[p] for p in predicted])
 
-		# reshape preds to match data structure
+		# Reshape preds to match data structure
 		preds = []
 		for i in range(len(data_tokens)):
 			doc_preds = []
@@ -390,6 +482,9 @@ class LSTM:
 			json.dump(data, f, indent=4)
 
 	def save(self) -> None:
+		"""
+		Saves the model to a file.
+		"""
 		model_dir = os.path.dirname(self.model_path)
 		if not os.path.exists(model_dir):
 			os.makedirs(model_dir)

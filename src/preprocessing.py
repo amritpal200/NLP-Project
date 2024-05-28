@@ -52,6 +52,7 @@ def sent_tokenize(
 	text_cpy = text
 	spans = []
 	l = 0
+	# save sentences but keep track of their original spans in the document
 	for sent in sents:
 		pos = text_cpy.find(sent)
 		span = (pos, pos + len(sent))
@@ -61,7 +62,8 @@ def sent_tokenize(
 		span = (l + span[0], l + span[1])
 		spans.append({"text":sent, "span":span})
 		l = span[1]
-	if text_cpy:
+	if text_cpy: # there is still text left
+		# add it as a last sentence
 		last_sent, last_span = spans[-1]["text"], spans[-1]["span"]
 		last_span = (last_span[0], len(text))
 		last_sent = last_sent + text_cpy
@@ -77,6 +79,7 @@ def sent_tokenize_corpus(
 		Returns a list of lists of dictionaries with keys "text", "span" and "lang".
 	"""
 	corpus_sents = []
+	# call sent_tokenize for each document and detect language for each sentence
 	for d in tqdm(corpus, disable=not verbose):
 		text = d["data"]["text"]
 		spans = sent_tokenize(text)
@@ -119,6 +122,7 @@ def tokenize_corpus(
 			text = sent["text"]
 			span = sent["span"]
 			lang = sent["lang"]
+			# tokenize text
 			if lang == "es":
 				doc = nlp_es.tokenizer(text)
 			else:
@@ -173,15 +177,16 @@ def lemmatize_corpus(
 		Returns a list of lists of dictionaries with keys "lemmas", "spans" and "lang".
 	"""
 	def custom_tokenizer(nlp):
+		# Just split by spaces
 		return Tokenizer(nlp.vocab, token_match=re.compile(r'\S+').match)
 
-	# print("Preparing tokenizers...")
+	# Prepare custom tokenizers
 	nlp_es_custom = deepcopy(nlp_es)
 	nlp_es_custom.tokenizer = custom_tokenizer(nlp_es_custom)
 	nlp_ca_custom = deepcopy(nlp_ca)
 	nlp_ca_custom.tokenizer = custom_tokenizer(nlp_ca_custom)
 
-	# print("Lemmatizing...")
+	# Lemmatize tokens
 	tokens_lemmatized = []
 	for d in tqdm(tokens, disable=not verbose):
 		d_tokens = []
@@ -193,6 +198,7 @@ def lemmatize_corpus(
 			else:
 				doc = nlp_ca_custom(" ".join(sent["tokens"]))
 			lemmas = [token.lemma_ for token in doc]
+			# ensure lemmatization worked properly
 			assert len(lemmas) == len(sent["tokens"]), f"\n{lemmas}\n{sent['tokens']}"
 			sent_tokens = {"tokens": np.array(lemmas), "spans": sent["spans"], "lang": lang}
 			d_tokens.append(sent_tokens)

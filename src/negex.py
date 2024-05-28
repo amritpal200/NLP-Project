@@ -1,46 +1,24 @@
 from preprocessing import *
 import blindNegex
 import os
-import deprecated.cutext as cutext
 
 ROOT_DIR = os.path.dirname(os.path.abspath(""))
-
-def write_tokens_txt(
-		tokens: np.ndarray,
-		path: str
-) -> None:
-	directory = os.path.dirname(path)
-	if not os.path.exists(directory):
-		os.makedirs(directory)
-	with open(path, "w") as f:
-		f.write(" ".join(tokens))
-
-def read_terms_txt(
-		path: str
-) -> List[str]:
-	with open(path, "r") as f:
-		terms = [line.split("|")[0] for line in f]
-	return terms
-
-def get_medical_terms(
-		tokens: np.ndarray,
-		cutext_path: Optional[str] = None
-) -> List[List[str]]:
-	write_tokens_txt(tokens, os.path.join(ROOT_DIR, "temp", "cutext_in.txt"))
-	cutext.process_input(cutext_path)
-	terms = read_terms_txt(os.path.join(ROOT_DIR, "temp", "hsimpli.txt"))
-	terms = [term.split(" ") for term in terms]
-	return terms
 
 def get_medical_terms(
 		tokens: np.ndarray,
 		all_medical_terms: np.ndarray
-):
+) -> np.ndarray:
+	"""
+	Returns a list of medical terms that are present in the tokens.
+	"""
 	return np.intersect1d(tokens, all_medical_terms)
 
 def prepare_negation_speculation(
 		negation_speculation_path: str
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+	"""
+	Reads the file and returns the negation and speculation words and their directions (1 for pre, -1 for post)
+	"""
 	negations = blindNegex.read_negations(negation_speculation_path)
 	words, tags = zip(*negations.items())
 	negation_words = np.array([word for i, word in enumerate(words) if tags[i] in ("[PREN]", "[POST]")])
@@ -59,6 +37,9 @@ def get_indices(
 		speculation_words: np.ndarray,
 		speculation_dirs: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+	"""
+	Returns the indices of the negation and speculation words in the tokens, and their directions.
+	"""
 	neg_bin = np.isin(tokens, negation_words)
 	neg_idx = np.where(neg_bin)[0]
 	neg_dir = negation_dirs[neg_idx]
@@ -101,16 +82,24 @@ def get_contexts_bin(
 		neg_dir: np.ndarray,
 		max_context_size: int
 ) -> List[np.ndarray]:
+	"""
+	Extracts the context of the negation and speculation words according to their
+	directions and the present medical terms.
+		Returns a list of binary arrays for each negation or speculation word,
+		where 1s represent the context.
+	"""
 	terms_idx = np.repeat(terms_idx[None, :], len(neg_idx), axis=0)
-	context_dis = terms_idx - neg_idx[:, None]
-	context_bin = np.sign(context_dis) == neg_dir[:, None]
-	near_bin = np.abs(context_dis) <= max_context_size
-	context_near_bin = context_bin & near_bin
-	context_near = [terms_idx[i][context_near_bin[i]] for i in range(len(neg_idx))]
+	context_dis = terms_idx - neg_idx[:, None] # distance from the term to the negation word
+	context_bin = np.sign(context_dis) == neg_dir[:, None] # full context in the direction of the negation word
+	near_bin = np.abs(context_dis) <= max_context_size # context within a certain distance
+	context_near_bin = context_bin & near_bin # context in the direction of the negation word and within a certain distance
+	context_near = [terms_idx[i][context_near_bin[i]] for i in range(len(neg_idx))] # indices of the context words
+	# find the end of the context (last word if direction is forward, first word if backward)
 	context_end = np.array([context_near[i].max(initial=-1) if neg_dir[i] \
 						 else context_near[i].min(initial=-1) for i in range(len(neg_idx))])
-	if np.any(context_end == -1):
+	if np.any(context_end == -1): # at least one context is invalid
 		return [np.zeros_like(terms_bin) for _ in neg_idx]
+	# create the context binary arrays
 	context_idx = [np.arange(neg_idx[i]+neg_dir[i], context_end[i]+neg_dir[i], neg_dir[i]) for i in range(len(neg_idx))]
 	context_bin = [np.zeros_like(terms_bin) for _ in context_idx]
 	[np.put(ar, indices, 1) for ar, indices in zip(context_bin, context_idx)]
@@ -121,6 +110,9 @@ def get_contexts_span(
 		spans: np.ndarray,
 		contexts_bin: List[np.ndarray]
 ) -> List[np.ndarray]:
+	"""
+	Returns the start and end indices of the context spans in the given spans.
+	"""
 	tokens_span = [spans[np.where(indices)[0]] for indices in contexts_bin]
 	contexts_span = [[span[0][0], span[-1][1]] for span in tokens_span]
 	return contexts_span
@@ -128,6 +120,9 @@ def get_contexts_span(
 def save_spans(
 		spans: Tuple[np.ndarray, np.ndarray]
 ) -> List[Dict]:
+	"""
+	Saves the spans in the format required for the output.
+	"""
 	current_spans = []
 	neg_spans, spec_spans = spans
 	for span in neg_spans:
@@ -145,6 +140,9 @@ def process_sent(
 		speculation_dirs: np.ndarray,
 		max_context_size: int
 ) -> List[Dict]:
+	"""
+	Processes a sentence and returns the negation and speculation contexts.
+	"""
 	try:
 		terms = get_medical_terms(sent["tokens"], all_medical_terms)
 		neg_idx, neg_dir, unc_idx, unc_dir, terms_idx, terms_bin = \
@@ -166,6 +164,9 @@ def process_doc(
 		speculation_dirs: np.ndarray,
 		max_context_size: int
 ) -> List[Dict]:
+	"""
+	Processes a document and returns the negation and speculation contexts.
+	"""
 	all_spans = []
 	for sent in doc:
 		spans = process_sent(
@@ -184,6 +185,9 @@ def process_data(
 		data: List[List[Dict]],
 		max_context_size: int = 5
 ) -> List[Dict]:
+	"""
+	Processes a list of documents and returns the negation and speculation contexts.
+	"""
 	predictions = []
 	all_medical_terms = np.array(read_terms(os.path.join(ROOT_DIR, "data", "medical_terms.txt")))
 	negation_speculation_path = os.path.join(ROOT_DIR, "data", "negation_speculation_word.txt")
@@ -203,6 +207,7 @@ def process_data(
 	return predictions
 
 def _convert_int64_to_int(obj):
+	"""Converts an np.int64 object to int"""
 	if isinstance(obj, np.int64):
 		return int(obj)
 	return obj
@@ -213,6 +218,9 @@ def write_predictions(
 		name: str,
 		dir: Optional[str] = None
 ):
+	"""
+	Writes the predictions to a file.
+	"""
 	data_copy = data.copy()
 	for i in range(len(data_copy)):
 		data_copy[i]["predictions"] = []

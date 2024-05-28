@@ -12,6 +12,9 @@ ROOT_DIR = os.path.dirname(os.path.abspath(""))
 
 class EvalOfficial:
 	def __init__(self):
+		"""
+		Official evaluation class to compute precision, recall and F1 score based on scikit-learn.
+		"""
 		pass
 	
 	def process(self, data):
@@ -41,6 +44,10 @@ def save_results(
 		hyperparameters: dict,
 		method: str
 ) -> None:
+	"""
+	Save the results of the evaluation to a JSON file. Previous results are not overwritten
+	unless the hyperparameters are the same.
+	"""
 	try:
 		with open(path, 'r') as file:
 			data = json.load(file)
@@ -80,13 +87,18 @@ class EvalModel(EvalOfficial):
 			load_existing_tokens: bool = False,
 			**kwargs
 	):
+		"""
+		Abstract class for evaluation models.
+		"""
 		super(EvalModel, self).__init__()
 		self.verbose = kwargs.get("verbose", False)
 		self.save_dir = save_dir
 		self.results_dir = results_dir
 		self.data_path = data_path
 		self.data = self.load_data(self.data_path)
+
 		if not load_existing_tokens:
+			# Tokenize evaluation data and save tokens
 			if self.verbose: print("Creating evaluation tokens...")
 			self.create_tokens(
 				data=self.data,
@@ -113,8 +125,13 @@ class EvalModel(EvalOfficial):
 			remove_punctuation: bool = True,
 			replace_numbers: Optional[str] = None
 	) -> List[dict]:
+		"""
+		Tokenize the data and save the tokens.
+		"""
+		# tokenize to sentences
 		sents = sent_tokenize_corpus(data, verbose=self.verbose)
 		nlp_es, nlp_cat = load_nlps()
+		# tokenize to words
 		tokens = tokenize_corpus(
 			sents, nlp_es, nlp_cat,
 			remove_punctuation=remove_punctuation,
@@ -122,7 +139,9 @@ class EvalModel(EvalOfficial):
 			verbose=self.verbose
 		)
 		if lemmatize:
+			# lemmatize tokens
 			tokens = lemmatize_corpus(tokens, nlp_es, nlp_cat, verbose=self.verbose)
+		# save to file
 		save_tokens(tokens, os.path.join(self.save_dir, file_name))
 		return tokens
 	
@@ -137,6 +156,9 @@ class EvalModel(EvalOfficial):
 			metrics: dict,
 			hyperparameters: dict
 	) -> None:
+		"""
+		Save the results of the evaluation to a results.json file.
+		"""
 		save_results(
 			os.path.join(self.results_dir, "results.json"),
 			metrics,
@@ -145,13 +167,20 @@ class EvalModel(EvalOfficial):
 		)
 
 	def evaluate(self, **kwargs) -> dict:
+		"""
+		Evaluate the model with the given hyperparameters.
+		"""
 		if self.verbose: print("Predicting...")
+		# Make predictions
 		start_time = time()
 		self.predict(**kwargs)
 		total_time = time() - start_time
+		# Load predictions (assuming they've been saved to a file)
 		with open(os.path.join(self.save_dir, "data_predictions.json"), 'r', encoding='utf8') as _f:
 			predictions = json.load(_f)
+		# Load targets
 		self.data = self.load_data(self.data_path)
+		# Calculate metrics
 		if self.verbose: print("Calculating metrics...")
 		p, r, f1 = self.calc(predictions, self.data)
 		metrics = {
@@ -161,6 +190,7 @@ class EvalModel(EvalOfficial):
 			"time": round(total_time, 4)
 		}
 		if kwargs.get("save_results", True):
+			# Save results
 			kwargs.pop("save_results", None)
 			self.save_results(
 				metrics,
@@ -181,11 +211,15 @@ class EnhancedEvalModel(EvalModel):
 			load_existing_eval_pos: bool = False,
 			**kwargs
 	):
+		"""
+		Abstract class for evaluation models that require additional preprocessing (CRF and LSTM)
+		"""
 		super(EnhancedEvalModel, self).__init__(save_dir, results_dir, eval_data_path, load_existing_eval_tokens, **kwargs)
 		self.train_data_path = train_data_path
 		self.eval_data_path = eval_data_path
 		self.train_data = self.load_data(self.train_data_path)
 		if not load_existing_train_tokens:
+			# Tokenize training data and save tokens
 			if self.verbose: print("Creating training tokens...")
 			self.create_tokens(
 				data=self.train_data,
@@ -194,10 +228,12 @@ class EnhancedEvalModel(EvalModel):
 				remove_punctuation=kwargs.get("remove_punctuation", True),
 				replace_numbers=kwargs.get("replace_numbers", None)
 			)
+		# Create labels for training data
 		train_data_bio = crf.create_bio_tags(self.train_data, load_tokens(os.path.join(self.save_dir, "train_data_tokens.json")))
 		with open(os.path.join(self.save_dir, "train_data_bio.json"), 'w', encoding='utf8') as _f:
 			json.dump(train_data_bio, _f)
 		if not load_existing_train_pos:
+			# Create POS tags for training data
 			if self.verbose: print("Precomputing training POS tags...")
 			crf.precompute_pos(
 				tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
@@ -205,6 +241,7 @@ class EnhancedEvalModel(EvalModel):
 				verbose=self.verbose
 			)
 		if not load_existing_eval_pos:
+			# Create POS tags for evaluation data
 			if self.verbose: print("Precomputing evaluation POS tags...")
 			crf.precompute_pos(
 				tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
@@ -231,11 +268,13 @@ class EnhancedEvalModel(EvalModel):
 		total = 1
 		for v in values:
 			total *= len(v)
+		# Iterate over all combinations
 		p = 0
 		while True:
 			print(f"Progress: {p}/{total}", end="\r")
 			p += 1
 			params = {keys[i]: values[i][indexes[i]] for i in range(len(keys))}
+			# Train and evaluate the model with the current combination of hyperparameters
 			metrics = self.evaluate(**params)
 			combinations.append({"params": params, "metrics": metrics})
 			i = 0
@@ -249,6 +288,7 @@ class EnhancedEvalModel(EvalModel):
 			if i == len(keys):
 				break
 		print(f"Progress: {total}/{total}")
+		# Sort from best to worst
 		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
 	
 	def random_search(
@@ -261,6 +301,7 @@ class EnhancedEvalModel(EvalModel):
 		"""
 		combinations = []
 		
+		# Compute for n_iter iterations
 		for p in range(n_iter):
 			print(f"Progress: {p}/{n_iter}", end="\r")
 			
@@ -269,12 +310,14 @@ class EnhancedEvalModel(EvalModel):
 				params = {key: random.choice(values) for key, values in params_ranges.items()}
 				if params not in [c["params"] for c in combinations]:
 					break
+			# Train and evaluate the model with the current combination of hyperparameters
 			metrics = self.evaluate(**params)
 			if isinstance(metrics, tuple):
 				metrics, _ = metrics
 			combinations.append({"params": params, "metrics": metrics})
 		
 		print(f"Progress: {n_iter}/{n_iter}")
+		# Sort from best to worst
 		return sorted(combinations, key=lambda x: x["metrics"]["f1"], reverse=True)
 	
 	def cross_validation(
@@ -292,7 +335,7 @@ class EnhancedEvalModel(EvalModel):
 		"""
 		Perform cross-validation over the data.
 		"""
-		# save original data
+		# Save original data
 		original_train_data_path = self.train_data_path
 		original_eval_data_path = self.eval_data_path
 		original_train_data = self.train_data.copy()
@@ -302,21 +345,24 @@ class EnhancedEvalModel(EvalModel):
 			with open(os.path.join(self.save_dir, file_name), 'r', encoding='utf8') as _f:
 				original_data.append(json.load(_f))
 
-		# split, save and evaluate
+		# Split, save and evaluate
 		total_docs = len(self.train_data)
 		split_size = total_docs // n_splits
-		split_idxs = [i * split_size for i in range(n_splits)] + [total_docs]
+		split_idxs = [i * split_size for i in range(n_splits)] + [total_docs] # e.g. [0, 100, 200, 254]
 		results = []
 		for i in range(n_splits):
+			# Set global data paths
 			self.train_data_path = os.path.join(self.save_dir, "train_data.json")
 			self.eval_data_path = os.path.join(self.save_dir, "data.json")
 			self.data_path = self.eval_data_path
 
+			# K-fold split and save to those paths (overwrite)
 			with open(self.train_data_path, 'w', encoding='utf8') as _f:
 				json.dump(original_train_data[:split_idxs[i]] + original_train_data[split_idxs[i+1]:], _f)
 			with open(self.data_path, 'w', encoding='utf8') as _f:
 				json.dump(original_train_data[split_idxs[i]:split_idxs[i+1]], _f)
 				
+			# Same with extra files (e.g. tokens, pos, lemma)
 			for file_name, data in zip(file_names, original_data):
 				with open(os.path.join(self.save_dir, file_name), 'w', encoding='utf8') as _f:
 					if file_name.startswith("train"):
@@ -324,9 +370,10 @@ class EnhancedEvalModel(EvalModel):
 					else:
 						json.dump(data[split_idxs[i]:split_idxs[i+1]], _f)
 
-			results.append(self.evaluate(**kwargs, save_results=False))
+			# Train and evaluate on the split
+			results.append(self.evaluate(**kwargs, save_results=False)) # don't save results
 		
-		# return data to original state
+		# Return data to original state
 		os.remove(self.train_data_path)
 		os.remove(self.eval_data_path)
 		self.train_data_path = original_train_data_path
@@ -337,6 +384,7 @@ class EnhancedEvalModel(EvalModel):
 			with open(os.path.join(self.save_dir, file_name), 'w', encoding='utf8') as _f:
 				json.dump(data, _f)
 
+		# Calculate average metrics and save results
 		cv_results = {
 			"results": results,
 			"avg_precision": sum([r["precision"] for r in results]) / n_splits,
@@ -364,10 +412,16 @@ class EvalNegex(EvalModel):
 			load_existing_tokens: bool = False,
 			**kwargs
 	):
+		"""
+		Evaluation model for Negex.
+		"""
 		super(EvalNegex, self).__init__(save_dir, results_dir, data_path, load_existing_tokens, **kwargs)
 		self.name = "Negex"
 
 	def predict(self, **kwargs) -> None:
+		"""
+		Process the evaluation data using Negex and write the predictions to a file.
+		"""
 		tokens = self.load_tokens()
 		predictions = negex.process_data(tokens, max_context_size=kwargs.get("max_context_size", 5))
 		negex.write_predictions(self.data, predictions, "data_predictions.json", dir=self.save_dir.split("/")[-1])
@@ -385,11 +439,17 @@ class EvalCRF(EnhancedEvalModel):
 			load_existing_eval_pos: bool = False,
 			**kwargs
 	):
+		"""
+		Evaluation model for CRF.
+		"""
 		super(EvalCRF, self).__init__(save_dir, results_dir, train_data_path, eval_data_path, load_existing_train_tokens,\
 								load_existing_eval_tokens, load_existing_train_pos, load_existing_eval_pos, **kwargs)
 		self.name = "CRF"
 
 	def predict(self, **kwargs) -> None:
+		"""
+		Process the evaluation data using CRF and write the predictions to a file.
+		"""
 		self.model.process(
 			data_path=self.data_path,
 			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
@@ -398,10 +458,15 @@ class EvalCRF(EnhancedEvalModel):
 		)
 
 	def evaluate(self, **kwargs) -> dict:
+		"""
+		Evaluate the model with the given hyperparameters.
+			Returns the metrics.
+		"""
 		if self.verbose: print("Instantiating CRF...")
 		# delete previous model
 		if os.path.exists(os.path.join(self.save_dir, "crf_0_0.crfsuite")):
 			os.remove(os.path.join(self.save_dir, "crf_0_0.crfsuite"))
+		# Train CRF
 		self.model = crf.CRF(
 			model_path=os.path.join(self.save_dir, "crf_0_0.crfsuite"), # TODO: allow multiple models
 			trainer_params={k: v for k, v in kwargs.items() if k != "save_results"},
@@ -414,6 +479,7 @@ class EvalCRF(EnhancedEvalModel):
 			train_labels_path=os.path.join(self.save_dir, "train_data_bio.json"),
 			train_pos_path=os.path.join(self.save_dir, "train_data_pos.json")
 		)
+		# Evaluate and return metrics
 		hyperparams = kwargs
 		hyperparams["lemmatize"] = self.kwargs.get("lemmatize", False)
 		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
@@ -437,9 +503,13 @@ class EvalLSTM(EnhancedEvalModel):
 			load_existing_eval_lemmas: bool = False,
 			**kwargs
 	):
+		"""
+		Evaluation model for LSTM.
+		"""
 		super(EvalLSTM, self).__init__(save_dir, results_dir, train_data_path, eval_data_path, load_existing_train_tokens,\
 								load_existing_eval_tokens, load_existing_train_pos, load_existing_eval_pos, **kwargs)
 		if not load_existing_train_lemmas:
+			# Precompute lemmas for training data
 			if self.verbose: print("Precomputing training lemmas...")
 			lstm.precompute_lemmas(
 				tokens_path=os.path.join(self.save_dir, "train_data_tokens.json"),
@@ -447,6 +517,7 @@ class EvalLSTM(EnhancedEvalModel):
 				verbose=self.verbose
 			)
 		if not load_existing_eval_lemmas:
+			# Precompute lemmas for evaluation data
 			if self.verbose: print("Precomputing evaluation lemmas...")
 			lstm.precompute_lemmas(
 				tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
@@ -463,6 +534,9 @@ class EvalLSTM(EnhancedEvalModel):
 		self.name = "LSTM"
 
 	def predict(self, **kwargs) -> None:
+		"""
+		Process the evaluation data using LSTM and write the predictions to a file.
+		"""
 		self.model.process(
 			data_path=self.data_path,
 			tokens_path=os.path.join(self.save_dir, "data_tokens.json"),
@@ -472,10 +546,15 @@ class EvalLSTM(EnhancedEvalModel):
 		)
 
 	def evaluate(self, **kwargs) -> Tuple[dict, List[float]]:
+		"""
+		Evaluate the model with the given hyperparameters.
+			Returns the metrics and the losses.
+		"""
 		if self.verbose: print("Instantiating LSTM...")
 		# delete previous model
 		if os.path.exists(os.path.join(self.save_dir, "lstm_0_0.pt")):
 			os.remove(os.path.join(self.save_dir, "lstm_0_0.pt"))
+		# Train LSTM
 		self.model = lstm.LSTM(
 			model_path=os.path.join(self.save_dir, "lstm_0_0.pt"),
 			device=self.device,
@@ -490,6 +569,7 @@ class EvalLSTM(EnhancedEvalModel):
 			train_labels_path=os.path.join(self.save_dir, "train_data_bio.json"),
 			train_pos_path=os.path.join(self.save_dir, "train_data_pos.json")
 		)
+		# Evaluate and return metrics and losses
 		hyperparams = kwargs
 		hyperparams["lemmatize"] = self.kwargs.get("lemmatize", False)
 		hyperparams["remove_punctuation"] = self.kwargs.get("remove_punctuation", True)
