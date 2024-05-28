@@ -15,9 +15,6 @@ Group project for the NLP subject in our AI degree.
 	- `eval.py`: code to evaluate the model predictions
 	- `.ipynb` files: python scripts used during the development of this project, most of them to test and demonstrate the funcitonality of their corresponding `.py` files.
 
-## Requirements
-- Common NLP libraries: `nltk`, `spacy`, `langdetect`, `pycrfsuite`, `scikit-learn`
-
 ## Contributors
 - Amritpal Singh
 - Oscar Arrocha
