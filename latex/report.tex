@@ -42,7 +42,7 @@
 \begin{document}
 
 \title{Detection of negation and uncertainty in medical data}
-\author{Amritpal Singh, Oscar Arrocha, Mustapha El Aichouni, Eric López}
+\author{Amritpal Singh, Óscar Arrocha, Mustapha El Aichouni, Eric López}
 \date{May 14, 2024}
 \maketitle
 
@@ -117,7 +117,7 @@ so a first language detection step is performed over each sentence, distinguishi
 Next, the process consists of, for each sentence, identifying the negation or uncertainty words, then the medical terms.
 These steps are done by simply matching each word in our vocabulary of the corresponding terms. Finally the scope is detected,
 following the definition previously explained, using an efficient and straightforward approach: a binary mask of the sentence
-is created, where medical terms are 1, the rest 0. Also for each negation and uncertainty word a mask is created where words
+is created, where medical terms are 1, the rest 0. Also, for each negation and uncertainty word a mask is created where words
 with a distance equal or below 5 to that word are 1, the rest 0. For each word, both masks are matched using an overlapping
 criteria, where only sets of 1 that intersect or are externally connected remain in the resulting mask, which represents the
 scope for that word. This ensures that the scope includes at least a medical term within a distance of 5 words maximum.
@@ -285,7 +285,7 @@ tokens before and 1 after.
 Our grid search analysis is not exhaustive, but heuristic. The search is done in groups of parameters, so
 first the optimal value is found for those parameters, and then another search is done for another group,
 fixing the previous parameters to their optimal values. For this evaluation, the F1 score is used as the
-performance metric, as it leverages precision and recall. Moreover these other metrics have been observed
+performance metric, as it leverages precision and recall. Moreover, these other metrics have been observed
 before to be of identical value.
 
 \begin{figure}[!t]
@@ -369,17 +369,17 @@ and therefore, all the information can be found there.
 	\centering
 	\includegraphics[height=5.6cm]{images/model.jpg}
 	\captionsetup{width=0.9\textwidth}
-	\caption{Model architecture of the deep learning approach. It consists of a dense linear layer at each time-stemp,
+	\caption{Model architecture of the deep learning approach. It consists of a dense linear layer at each time-step,
 	followed by a bidirectional LSTM layer and another dense layer. It is a many-to-one model, taking a sequence of words as
 	inputs but outputting only the tag corresponding to the central word.}
 	\label{fig:model}
 \end{figure}
-The model, as shown in Figure \ref{fig:model} is composed of a dense linear layer, followed by a bidirectional LSTM 
-ayer and another dense layer.
+The model, as shown in Figure \ref{fig:model}, is composed of a dense linear layer, followed by a bidirectional LSTM 
+layer and another dense layer.
 The LSTM is used to learn complex patterns and dependencies within the sequential medical text data. By processing
 the text in both forward and backward directions, the bidirectional LSTM captures context from both preceding and 
 succeeding words, enhancing its ability to detect subtle cues and scopes of negation and uncertainty. The first
-dense layer is used to reduce the dimensionality of the input, while the later is used to transform the
+dense layer is used to reduce the dimensionality of the input, while the latter is used to transform the
 high-dimensional output of the LSTM into a final set of prediction scores, which indicate the likelihood of each
 word being part of a negation or uncertainty category (a BIO class). Thus, it is a many-to-one model: it takes a
 sequence of words as inputs but the output corresponds only to the central word.
@@ -388,11 +388,11 @@ sequence of words as inputs but the output corresponds only to the central word.
 The input of the model consists of sequences of k words. Specifically, for each word a sequence is created with
 the 0.8*k previous words and the 0.2*k posterior words. The decision to include less posterior information than
 anterior is based on the success we had in doing so with the CRF, as well as in previous literature \cite{lstm1}
-\cite{lstm2}. So, the sequence from A to B around a word W (and W itself) is passed to the model at one time-step.
-At the next time-step, the input will be a sequence from A+1 to B+1 and the word W+1. This means that the input
-sequences across time-steps are overlapping.
+\cite{lstm2}. So, the sequence from A to B around a word W (and W itself) is passed to the model at one iteration.
+At the next iteration, the input will be a sequence from A+1 to B+1 and the word W+1. This means that the input
+sequences across iterations are overlapping.
 
-For the embedding of the words, the following steps have been taken: first of all, the word lemma and the PoS
+For the embedding of the words, the following steps have been taken: first, the word lemma and the PoS
 tagging are computed for each word. Secondly, pretrained embeddings are extracted for the word itself and its
 lemma, obtaining two different vectors of 300 dimensions each. This is done with the help of the "fasttext" model
 \cite{joulin2016bag} \cite{joulin2016fasttext}. Next, a one hot vector is created consisting of the 17 grammatical
@@ -427,7 +427,7 @@ performance, but we thought this may be due to the extreme sequence length value
 	\captionsetup{width=0.9\textwidth}
 	\caption{F1 scores obtained for different evaluations of the model, trying different sequence length values (left)
 	and different hidden dimension values (right), using random search. Multiple F1 values for the same sequence lenght
-	or hidden dimension indicate that those evaluations differ in other hyperparameter values, and though the
+	or hidden dimension indicate that those evaluations differ in other hyperparameter values, and thus the
 	average (red line) is taken.}
 	\label{fig:lstm_analysis}
 \end{figure}
@@ -441,7 +441,7 @@ The initial approach was to use, for the input, a context window around the word
 of the same size before and after the word, that is, the same number of anterior words as posterior. By trying first
 a proportion of 60\% anterior and 40\% posterior size, and then 80-20\%, the F1 score rises from 0.953 to 0.961.
 As another study, the data preprocessing is changed. For instance, by not removing the punctuation from the text and
-replacing all numbers by a constant token <NUM>, the performance rises to 0.973.
+replacing all numbers by a constant token, the performance rises to 0.973.
 
 Finally, the architecture of the model is modified by adding a dense layer before the LSTM layer. This is done with
 the idea of reducing the input dimension for the LSTM, and thus the complexity of the model. By doing so, the performance
@@ -482,7 +482,7 @@ task, where each word in the text is assigned a tag that indicates its role in e
 model predicts one of these tags for each word in a sequence, leveraging comprehensive lexical, syntactic, and positional
 features for effective training.
 
-Comparatively, the biLSTM model shows just a slightly superior performance to the CRF algorithm, demonstrating that
+Comparatively, the BiLSTM model shows just a slightly superior performance to the CRF algorithm, demonstrating that
 traditional machine learning models can still be competitive in specific natural language processing tasks within the
 medical domain. Nevertheless, the enhancement of the dataset and the parameters number could imply a higher performance
 on the deep learning model. 
@@ -490,8 +490,8 @@ on the deep learning model.
 On the whole, our study explored the efficacy of different methodologies for detecting negation and uncertainty cues in
 medical texts. The Conditional Random Field (CRF) model outperformed the rule-based NegEx algorithm, exhibiting higher
 precision and recall and better capturing the complexity of medical language. On the other hand, the bidirectional Long-Short
-Term Memory (biLSTM) model showed only a slight performance edge over the CRF model. This indicates that while deep learning
-approaches like biLSTM have potential, traditional models like CRF remain robust and competitive, particularly with
+Term Memory (BiLSTM) model showed only a slight performance edge over the CRF model. This indicates that while deep learning
+approaches like BiLSTM have potential, traditional models like CRF remain robust and competitive, particularly with
 well-prepared data and comprehensive feature sets. These findings highlight the importance of tailored approaches in
 improving the accuracy and reliability of medical text analysis, ultimately supporting better clinical decision-making.
 
